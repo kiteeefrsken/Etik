@@ -3,86 +3,82 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My Website</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       margin: 0;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      place-items: center;
       background: #0d0d0f;
       color: white;
       font-family: Arial, sans-serif;
     }
-
     .card {
-      width: 90%;
+      width: 85%;
       max-width: 380px;
-      padding: 36px 26px;
+      padding: 35px 25px;
       text-align: center;
       background: #18181c;
       border: 1px solid #303036;
       border-radius: 18px;
     }
-
-    h1 {
-      font-size: 27px;
-      margin-bottom: 10px;
-    }
-
-    p {
-      color: #a5a5b0;
-      font-size: 14px;
-      margin-bottom: 28px;
-    }
-
-    button {
-      width: 100%;
-      padding: 13px;
-      border: none;
-      border-radius: 9px;
-      background: white;
-      color: #171717;
-      font-size: 15px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #e6e6e6;
-    }
-
-    .note {
-      font-size: 11px;
-      margin-top: 20px;
-      margin-bottom: 0;
-    }
+    p { color: #aaaab5; }
+    #google-button { display: flex; justify-content: center; margin: 25px 0; }
+    #profile { display: none; overflow-wrap: anywhere; }
+    #avatar { width: 70px; height: 70px; border-radius: 50%; }
+    button { padding: 10px 20px; cursor: pointer; }
   </style>
 </head>
 <body>
   <main class="card">
-    <h1>Welcome</h1>
-    <p>Sign in to continue to my website.</p>
-
-    <button id="signin">
-      Continue with Google
-    </button>
-
-    <p class="note">
-      Secure sign-in powered by Google
-    </p>
+    <section id="welcome">
+      <h1>Welcome</h1>
+      <p>Sign in to continue to my website.</p>
+      <div id="google-button"></div>
+      <p>Secure sign-in powered by Google</p>
+    </section>
+    <section id="profile">
+      <h2>You're signed in!</h2>
+      <img id="avatar" alt="Profile picture">
+      <h3 id="name"></h3>
+      <p id="email"></p>
+      <button id="logout">Sign out</button>
+    </section>
   </main>
-
   <script>
-    document.getElementById("signin").addEventListener("click", () => {
-      alert("Google Sign-In will be connected in the next step!");
+    const CLIENT_ID = "85380596885-7fjqj6betale7j83afkd6lhatt9oabqk.apps.googleusercontent.com";
+
+    function handleCredentialResponse(response) {
+      const payload = JSON.parse(
+        atob(response.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+      );
+      document.getElementById("name").textContent = payload.name || "";
+      document.getElementById("email").textContent = payload.email || "";
+      document.getElementById("avatar").src = payload.picture || "";
+      document.getElementById("welcome").style.display = "none";
+      document.getElementById("profile").style.display = "block";
+    }
+
+    document.getElementById("logout").onclick = () => {
+      document.getElementById("profile").style.display = "none";
+      document.getElementById("welcome").style.display = "block";
+      google.accounts.id.disableAutoSelect();
+    };
+
+    window.addEventListener("load", () => {
+      google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("google-button"),
+        { theme: "outline", size: "large", text: "signin_with" }
+      );
     });
   </script>
 </body>
 </html>
+
