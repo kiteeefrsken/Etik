@@ -1,361 +1,456 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My Account</title>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <style>
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: #0b0d12;
-      color: #f4f4f5;
-      font-family: Arial, sans-serif;
-    }
-
-    nav {
-      padding: 20px 7%;
-      border-bottom: 1px solid #242631;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .brand { font-size: 21px; font-weight: bold; }
-    .accent { color: #a78bfa; }
-
-    main {
-      width: 92%;
-      max-width: 760px;
-      margin: 45px auto;
-    }
-
-    .card {
-      background: #151720;
-      border: 1px solid #292c39;
-      border-radius: 18px;
-      padding: 28px;
-      margin-bottom: 20px;
-    }
-
-    h1 { margin-top: 0; font-size: 28px; }
-    p { color: #a5a7b4; line-height: 1.6; }
-
-    input, textarea {
-      display: block;
-      width: 100%;
-      margin: 8px 0 18px;
-      padding: 13px;
-      background: #0d0f16;
-      color: white;
-      border: 1px solid #343746;
-      border-radius: 9px;
-      font: inherit;
-    }
-
-    textarea { min-height: 95px; resize: vertical; }
-
-    label { font-size: 14px; color: #d4d4dc; }
-
-    button {
-      padding: 12px 17px;
-      border: 0;
-      border-radius: 9px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 14px;
-    }
-
-    .primary { background: #8b5cf6; color: white; }
-    .secondary { background: #292c39; color: white; }
-    .danger { background: #3b2028; color: #ffb6c1; }
-
-    button:disabled { opacity: .6; cursor: wait; }
-
-    .profile-head {
-      display: flex;
-      align-items: center;
-      gap: 17px;
-      margin-bottom: 24px;
-    }
-
-    #avatar {
-      width: 76px;
-      height: 76px;
-      object-fit: cover;
-      border-radius: 50%;
-      background: #292c39;
-    }
-
-    #email { overflow-wrap: anywhere; }
-    #status { font-size: 14px; overflow-wrap: anywhere; }
-    #app { display: none; }
-    #google-button { margin-top: 22px; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-    .muted { font-size: 13px; }
-
-    footer {
-      text-align: center;
-      padding: 20px;
-      color: #777b8b;
-      font-size: 13px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit — Your Space</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--bg:#0b0d12;--panel:#141720;--panel2:#1a1e2a;--border:#292e3d;--text:#f4f5fb;--muted:#9da3b5;--accent:#a78bfa;--purple:#8b5cf6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Arial,sans-serif}
+body.light{--bg:#f4f5fa;--panel:#fff;--panel2:#efeff7;--border:#dedfea;--text:#202132;--muted:#686d80}
+button,input,textarea{font:inherit}
+button{cursor:pointer;border:0;border-radius:10px;padding:11px 15px;font-weight:bold}
+.primary{background:var(--purple);color:white}
+.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+.danger{background:#49232d;color:#ffb6c1}
+.hidden{display:none!important}
+.muted{color:var(--muted)}
+header{height:70px;padding:0 5%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5}
+.brand{font-size:24px;font-weight:900}.brand span{color:var(--accent)}
+.head-actions{display:flex;align-items:center;gap:10px}
+#header-avatar,.avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--panel2)}
+.layout{max-width:1150px;margin:28px auto;padding:0 18px;display:grid;grid-template-columns:190px minmax(0,620px) 240px;gap:22px;align-items:start}
+.card,.side{background:var(--panel);border:1px solid var(--border);border-radius:17px;padding:20px;margin-bottom:16px}
+.side{padding:13px;position:sticky;top:88px}
+.navitem{display:block;width:100%;text-align:left;background:transparent;color:var(--muted);padding:12px;border-radius:10px;margin:3px 0}
+.navitem.active,.navitem:hover{background:var(--panel2);color:var(--text)}
+h1{font-size:29px;line-height:1.15;margin:0 0 12px}
+h2{font-size:19px;margin:0 0 12px}
+p{line-height:1.6}
+.welcome{padding:27px;background:radial-gradient(ellipse at top right,#8b5cf626,transparent 60%),var(--panel)}
+.welcome p{color:var(--muted)}
+textarea,input{width:100%;padding:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;outline:none}
+textarea{min-height:100px;resize:vertical}
+label{display:block;color:var(--muted);font-size:13px;margin:14px 0 6px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px}
+.post-head{display:flex;align-items:center;gap:10px}
+.post-name{font-weight:bold}
+.meta{font-size:12px;color:var(--muted)}
+.post-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin:15px 0}
+.post-actions{display:flex;gap:7px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px}
+.post-actions button{background:transparent;color:var(--muted);padding:8px}
+.post-actions .liked{color:#f472b6}
+.comment{display:flex;gap:9px;margin:12px 0}
+.comment img{width:30px;height:30px}
+.comment-bubble{background:var(--panel2);padding:9px 12px;border-radius:0 12px 12px 12px;flex:1;overflow-wrap:anywhere}
+.comment-bubble p{margin:3px 0}
+.comment-form{display:flex;gap:8px;margin-top:12px}
+.comment-form input{min-width:0}
+.empty{text-align:center;color:var(--muted);padding:28px 10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:15px}
+.stat{background:var(--panel2);padding:10px 4px;text-align:center;border-radius:10px}
+.stat b{display:block;font-size:19px}.stat span{font-size:11px;color:var(--muted)}
+.achievement{padding:11px;background:var(--panel2);border:1px solid var(--border);border-radius:11px;font-size:13px;margin:7px 0}
+.achievement.locked{opacity:.45}
+.cover{height:100px;border-radius:12px;background:linear-gradient(120deg,#8b5cf6,#38bdf8)}
+.profile-info{text-align:center;margin-top:-43px}
+.profile-info img{width:82px;height:82px;border:4px solid var(--panel)}
+.field{margin-bottom:12px}
+.status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:20;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;max-width:90%;overflow-wrap:anywhere}
+#signin{min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(ellipse at top,#8b5cf626,transparent 60%),var(--bg)}
+.signin-card{width:min(100%,450px);text-align:center;padding:35px}
+.signin-card .brand{font-size:32px;margin-bottom:28px}
+.signin-card p{color:var(--muted)}
+.orb{width:70px;height:70px;margin:auto;border-radius:22px;background:linear-gradient(135deg,#8b5cf6,#38bdf8);display:grid;place-items:center;font-size:34px}
+.mobile-nav{display:none}
+footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
+@media(max-width:950px){.layout{grid-template-columns:175px minmax(0,1fr)}.right{display:none}}
+@media(max-width:650px){header{height:60px;padding:0 12px}.layout{display:block;margin:14px auto;padding:0 10px}.left{display:none}.card{padding:15px}.mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:8;background:var(--panel);border-top:1px solid var(--border);justify-content:space-around;padding:6px 2px}.mobile-nav .navitem{width:auto;font-size:10px;text-align:center;padding:7px 5px;margin:0}.status{bottom:70px}.head-actions{gap:5px}.head-actions button{padding:9px}.head-actions #header-name{display:none}}
+</style>
 </head>
 <body>
-  <nav>
-    <div class="brand">My<span class="accent">Account</span></div>
-    <span class="muted">Your personal space</span>
-  </nav>
+
+<section id="signin">
+  <div class="card signin-card">
+    <div class="brand">orb<span>it.</span></div>
+    <div class="orb">✦</div>
+    <h1 style="margin-top:20px">Your space on the internet.</h1>
+    <p>Share thoughts, meet people, and make this little corner yours.</p>
+    <div id="google-button" style="display:flex;justify-content:center;min-height:44px"></div>
+  </div>
+</section>
+
+<div id="site" class="hidden">
+<header>
+  <div class="brand">orb<span>it.</span></div>
+  <div class="head-actions">
+    <button class="secondary" id="theme-toggle" title="Toggle theme">☼</button>
+    <button class="secondary" id="notifications-btn" title="Notifications">♧</button>
+    <img id="header-avatar" alt="Profile">
+    <span id="header-name"></span>
+    <button class="danger" id="logout">Sign out</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="left">
+    <div class="side">
+      <button class="navitem active" data-view="home">⌂ Home feed</button>
+      <button class="navitem" data-view="profile">◉ My profile</button>
+      <button class="navitem" data-view="achievements">✧ Achievements</button>
+      <button class="navitem" data-view="notifications">♧ Notifications</button>
+      <button class="navitem" data-view="messages">✉ Messages</button>
+      <hr style="border-color:var(--border);margin-top:18px">
+      <p class="muted" style="font-size:12px">YOUR SPACE, YOUR RULES ✦</p>
+    </div>
+  </aside>
 
   <main>
-    <section id="welcome" class="card">
-      <h1>Welcome 👋</h1>
-      <p>Sign in to open your personal dashboard.</p>
-      <div id="google-button"></div>
+    <section id="view-home">
+      <div class="card welcome">
+        <h1>A little space<br>to be yourself.</h1>
+        <p>What's happening in your orbit today?</p>
+        <button class="primary" id="focus-composer">Create a post ＋</button>
+      </div>
+
+      <div class="card" id="composer-card">
+        <h2>Share something</h2>
+        <form id="post-form">
+          <textarea id="post-text" maxlength="2000" required placeholder="What's on your mind?"></textarea>
+          <div class="row">
+            <span class="muted" id="char-count">0 / 2000</span>
+            <button class="primary" id="post-submit">Publish post ↗</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="title-row">
+        <h2>Your feed</h2>
+        <button class="secondary" id="refresh-feed">↻ Refresh</button>
+      </div>
+      <div id="feed"><div class="card empty">Loading feed…</div></div>
     </section>
 
-    <div id="app">
-      <section class="card">
-        <div class="profile-head">
-          <img id="avatar" alt="Profile picture">
-          <div>
-            <h1 id="heading">Your dashboard</h1>
-            <p id="email"></p>
-          </div>
+    <section id="view-profile" class="hidden">
+      <div class="card">
+        <div class="cover"></div>
+        <div class="profile-info">
+          <img id="profile-avatar" class="avatar" alt="Profile">
+          <h2 id="profile-title">Your profile</h2>
+          <div class="muted" id="profile-handle"></div>
+          <p class="muted" id="profile-bio-display"></p>
         </div>
-        <p>Welcome to your account. You can update your profile below.</p>
-      </section>
-
-      <section class="card">
+      </div>
+      <div class="card">
         <h2>Edit profile</h2>
-        <p>Customize how your profile appears on this website.</p>
-
         <form id="profile-form">
           <label for="displayName">Display name</label>
           <input id="displayName" maxlength="80" required>
-
           <label for="username">Username</label>
-          <input id="username" maxlength="30"
-                 placeholder="e.g. cooluser">
-
+          <input id="username" maxlength="30" placeholder="cooluser">
           <label for="bio">About me</label>
-          <textarea id="bio" maxlength="300"
-                    placeholder="Write something about yourself..."></textarea>
-
-          <button id="save" class="primary" type="submit">
-            Save changes
-          </button>
+          <textarea id="bio" maxlength="300" placeholder="Write something about yourself…"></textarea>
+          <button class="primary" id="save-profile" style="margin-top:14px">Save changes</button>
         </form>
-      </section>
-
-      <section class="card">
-        <h2>Account</h2>
-        <p>Your account is connected through Google.</p>
-        <div class="actions">
-          <button id="logout" class="danger" type="button">
-            Sign out
-          </button>
+      </div>
+      <div class="card">
+        <h2>Your activity</h2>
+        <div class="stats">
+          <div class="stat"><b id="my-post-count">0</b><span>Posts</span></div>
+          <div class="stat"><b id="my-like-count">0</b><span>Likes received</span></div>
+          <div class="stat"><b id="my-comment-count">0</b><span>Comments</span></div>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
 
-    <p id="status" role="status"></p>
+    <section id="view-achievements" class="hidden">
+      <div class="card">
+        <h2>Your achievements ✧</h2>
+        <p class="muted">Little milestones from being part of Orbit.</p>
+        <div id="achievement-list"></div>
+      </div>
+    </section>
+
+    <section id="view-notifications" class="hidden">
+      <div class="card">
+        <h2>Notifications ♧</h2>
+        <p class="muted">Community activity related to you.</p>
+        <div id="notifications-list" class="empty">No notifications yet.</div>
+      </div>
+    </section>
+
+    <section id="view-messages" class="hidden">
+      <div class="card">
+        <h2>Messages ✉</h2>
+        <div class="empty">
+          <div style="font-size:32px">✉</div>
+          <b>Good conversations start here.</b>
+          <p class="muted">Private messaging needs an additional secure Firestore implementation and is not enabled yet.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <footer>MyAccount · Your profile, your space.</footer>
+  <aside class="right">
+    <div class="side">
+      <h2>Your orbit</h2>
+      <b id="side-name"></b>
+      <div class="muted" id="side-handle"></div>
+      <div class="stats">
+        <div class="stat"><b id="side-post-count">0</b><span>Posts</span></div>
+        <div class="stat"><b id="side-like-count">0</b><span>Likes</span></div>
+        <div class="stat"><b id="side-comment-count">0</b><span>Replies</span></div>
+      </div>
+    </div>
+    <div class="side">
+      <h2>Achievements</h2>
+      <div id="side-achievements"></div>
+      <button class="secondary" data-goto="achievements" style="margin-top:10px">View all</button>
+    </div>
+    <div class="side"><b>✦ A small reminder</b><p class="muted">You don't have to be perfect to belong here. Be kind to yourself and others.</p></div>
+  </aside>
+</div>
 
-  <script type="module">
-    import { initializeApp } from
-      "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+<nav class="mobile-nav">
+  <button class="navitem active" data-view="home">⌂<br>Home</button>
+  <button class="navitem" data-view="profile">◉<br>Profile</button>
+  <button class="navitem" data-view="achievements">✧<br>Badges</button>
+  <button class="navitem" data-view="notifications">♧<br>Alerts</button>
+  <button class="navitem" data-view="messages">✉<br>Messages</button>
+</nav>
+<footer>orbit. · Your space, your pace.</footer>
+</div>
+<div id="status" class="status hidden" role="status"></div>
 
-    import {
-      getAuth,
-      GoogleAuthProvider,
-      signInWithCredential,
-      signOut,
-      onAuthStateChanged,
-      updateProfile
-    } from
-      "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, collection, query, orderBy, limit, getDocs, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-    import {
-      getFirestore,
-      doc,
-      getDoc,
-      setDoc,
-      serverTimestamp
-    } from
-      "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyBN_q_5tq-QlPKRuZNE0oecRRc4HkyqLQc",
+  authDomain: "myloginwebsite-69221.firebaseapp.com",
+  projectId: "myloginwebsite-69221",
+  storageBucket: "myloginwebsite-69221.firebasestorage.app",
+  messagingSenderId: "101628268619",
+  appId: "1:101628268619:web:0d3b4ed427ca6a016cbdce",
+  measurementId: "G-LZ9GJJVS07"
+};
+const CLIENT_ID = "101628268619-kvnkedv0iuh7kj13f8ek92ncemt5srfn.apps.googleusercontent.com";
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const fallback = "https://www.gravatar.com/avatar/?d=mp";
+let user = null, profile = {}, posts = [], comments = [], timer;
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBN_q_5tq-QlPKRuZNE0oecRRc4HkyqLQc",
-      authDomain: "myloginwebsite-69221.firebaseapp.com",
-      projectId: "myloginwebsite-69221",
-      storageBucket: "myloginwebsite-69221.firebasestorage.app",
-      messagingSenderId: "101628268619",
-      appId: "1:101628268619:web:0d3b4ed427ca6a016cbdce",
-      measurementId: "G-LZ9GJJVS07"
-    };
+function say(text) {
+  $("status").textContent = text;
+  $("status").classList.remove("hidden");
+  clearTimeout(timer);
+  timer = setTimeout(() => $("status").classList.add("hidden"), 4000);
+}
+function esc(s="") {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+function img(url) { return esc(url || fallback); }
+function time(ts) {
+  try {
+    const d = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+    return d ? d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "just now";
+  } catch { return "recently"; }
+}
+function name() { return profile.name || user?.displayName || "Orbit member"; }
+function switchView(v) {
+  document.querySelectorAll("[id^='view-']").forEach(el => el.classList.toggle("hidden", el.id !== "view-"+v));
+  document.querySelectorAll("[data-view]").forEach(el => el.classList.toggle("active",el.dataset.view===v));
+  if(v==="profile") renderProfile();
+  if(v==="achievements") renderAchievements();
+  if(v==="notifications") loadNotifications();
+}
+document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));
+document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.goto)));
+$("notifications-btn").onclick=()=>switchView("notifications");
+$("focus-composer").onclick=()=>{$("post-text").focus();$("composer-card").scrollIntoView({behavior:"smooth",block:"center"});};
+$("refresh-feed").onclick=loadFeed;
+$("post-text").addEventListener("input",()=>{$("char-count").textContent=$("post-text").value.length+" / 2000";});
+$("theme-toggle").onclick=()=>{
+  document.body.classList.toggle("light");
+  $("theme-toggle").textContent=document.body.classList.contains("light")?"☾":"☼";
+  try{localStorage.setItem("orbit-theme",document.body.classList.contains("light")?"light":"dark")}catch{}
+};
+try{if(localStorage.getItem("orbit-theme")==="light"){document.body.classList.add("light");$("theme-toggle").textContent="☾";}}catch{}
 
-    const CLIENT_ID =
-      "101628268619-kvnkedv0iuh7kj13f8ek92ncemt5srfn.apps.googleusercontent.com";
+async function googleCredential(response) {
+  say("Signing in…");
+  try {
+    await signInWithCredential(auth,GoogleAuthProvider.credential(response.credential));
+    say("Welcome to Orbit!");
+  } catch(e) {
+    console.error(e); say("Sign-in failed: "+e.message);
+  }
+}
+function initGoogle() {
+  if(!window.google?.accounts?.id){setTimeout(initGoogle,250);return;}
+  google.accounts.id.initialize({client_id:CLIENT_ID,callback:googleCredential});
+  google.accounts.id.renderButton($("google-button"),{theme:"filled_black",size:"large",shape:"pill",text:"continue_with",width:270});
+}
+initGoogle();
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+onAuthStateChanged(auth,async current=>{
+  user=current;
+  if(!user){$("signin").classList.remove("hidden");$("site").classList.add("hidden");return;}
+  $("signin").classList.add("hidden");$("site").classList.remove("hidden");
+  await loadProfile(); await loadFeed();
+});
 
-    const $ = id => document.getElementById(id);
-    let loadingProfile = false;
+async function loadProfile() {
+  try {
+    const ref=doc(db,"users",user.uid), snap=await getDoc(ref);
+    const saved=snap.exists()?snap.data():{};
+    profile={...saved,uid:user.uid,name:saved.name||user.displayName||"",username:saved.username||"",bio:saved.bio||"",email:user.email||"",photoURL:user.photoURL||saved.photoURL||""};
+    await setDoc(ref,{uid:user.uid,name:profile.name,email:profile.email,photoURL:profile.photoURL,provider:"google",createdAt:saved.createdAt||serverTimestamp(),lastSignInAt:serverTimestamp()},{merge:true});
+    $("displayName").value=profile.name;
+    $("username").value=profile.username;
+    $("bio").value=profile.bio;
+    renderProfile();
+  } catch(e) { console.error(e);say("Could not load profile: "+e.message); }
+}
+function renderProfile() {
+  if(!user)return;
+  const photo=img(profile.photoURL||user.photoURL), n=name(), handle="@"+(profile.username||"orbit-member");
+  $("header-avatar").src=photo;$("profile-avatar").src=photo;
+  $("header-name").textContent=n;$("side-name").textContent=n;
+  $("side-handle").textContent=handle;$("profile-title").textContent=n;
+  $("profile-handle").textContent=handle+" · "+(user.email||"");
+  $("profile-bio-display").textContent=profile.bio||"No bio yet — add a little about yourself.";
+  renderStats();
+}
+$("profile-form").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!user)return;
+  const n=$("displayName").value.trim(), u=$("username").value.trim(), b=$("bio").value.trim();
+  if(!n)return say("Please enter a display name.");
+  if(u&&!/^[a-zA-Z0-9_]{3,30}$/.test(u))return say("Username must be 3–30 letters, numbers or underscores.");
+  $("save-profile").disabled=true;
+  try{
+    await updateProfile(user,{displayName:n});
+    await setDoc(doc(db,"users",user.uid),{uid:user.uid,name:n,username:u,bio:b,email:user.email||"",photoURL:user.photoURL||"",provider:"google",updatedAt:serverTimestamp()},{merge:true});
+    profile={...profile,name:n,username:u,bio:b};renderProfile();say("Profile saved!");
+  }catch(e){console.error(e);say("Save failed: "+e.message);}
+  finally{$("save-profile").disabled=false;}
+});
+$("logout").onclick=async()=>{try{await signOut(auth);window.google?.accounts?.id?.disableAutoSelect();say("Signed out.");}catch(e){say("Sign-out failed: "+e.message);}};
 
-    function message(text) {
-      $("status").textContent = text;
-    }
+$("post-form").addEventListener("submit",async e=>{
+  e.preventDefault();if(!user)return;
+  const text=$("post-text").value.trim();if(!text)return;
+  $("post-submit").disabled=true;
+  try{
+    await addDoc(collection(db,"posts"),{uid:user.uid,authorName:name(),authorUsername:profile.username||"",authorPhoto:profile.photoURL||user.photoURL||"",text,likes:[],createdAt:serverTimestamp()});
+    $("post-text").value="";$("char-count").textContent="0 / 2000";say("Your post is live!");await loadFeed();
+  }catch(e){console.error(e);say("Could not publish: "+e.message);}
+  finally{$("post-submit").disabled=false;}
+});
 
-    function showDashboard(user) {
-      $("welcome").style.display = "none";
-      $("app").style.display = "block";
-      $("heading").textContent = user.displayName || "Your dashboard";
-      $("email").textContent = user.email || "";
-
-      $("avatar").src = user.photoURL ||
-        "https://www.gravatar.com/avatar/?d=mp";
-    }
-
-    async function handleCredentialResponse(response) {
-      message("Signing in...");
+async function loadFeed() {
+  if(!user)return;
+  $("feed").innerHTML='<div class="card empty">Loading posts…</div>';
+  try {
+    const snap=await getDocs(query(collection(db,"posts"),orderBy("createdAt","desc"),limit(60)));
+    posts=snap.docs.map(d=>({id:d.id,...d.data()}));
+    comments=[];
+    for(const p of posts) {
       try {
-        const credential =
-          GoogleAuthProvider.credential(response.credential);
-
-        await signInWithCredential(auth, credential);
-        message("Signed in successfully!");
-      } catch (error) {
-        console.error(error);
-        message("Sign-in failed: " + error.message);
-      }
+        const cs=await getDocs(query(collection(db,"posts",p.id,"comments"),orderBy("createdAt","asc"),limit(30)));
+        cs.forEach(d=>comments.push({id:d.id,postId:p.id,...d.data()}));
+      } catch(e) { console.warn("Comments unavailable",e); }
     }
-
-    onAuthStateChanged(auth, async user => {
-      if (!user) {
-        $("app").style.display = "none";
-        $("welcome").style.display = "block";
-        return;
-      }
-
-      showDashboard(user);
-      if (loadingProfile) return;
-      loadingProfile = true;
-
-      try {
-        const ref = doc(db, "users", user.uid);
-        const snapshot = await getDoc(ref);
-        const saved = snapshot.exists() ? snapshot.data() : {};
-
-        $("displayName").value =
-          saved.name || user.displayName || "";
-        $("username").value = saved.username || "";
-        $("bio").value = saved.bio || "";
-
-        // Create a profile for users signing in for the first time.
-        await setDoc(ref, {
-          uid: user.uid,
-          name: saved.name || user.displayName || "",
-          email: user.email || "",
-          photoURL: user.photoURL || "",
-          provider: "google",
-          createdAt: saved.createdAt || serverTimestamp(),
-          lastSignInAt: serverTimestamp()
-        }, { merge: true });
-
-      } catch (error) {
-        console.error(error);
-        message("Could not load profile: " + error.message);
-      } finally {
-        loadingProfile = false;
-      }
-    });
-
-    $("profile-form").addEventListener("submit", async event => {
-      event.preventDefault();
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const name = $("displayName").value.trim();
-      const username = $("username").value.trim();
-      const bio = $("bio").value.trim();
-
-      if (!name) {
-        message("Please enter a display name.");
-        return;
-      }
-
-      if (username && !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
-        message("Username must be 3–30 characters: letters, numbers or underscores.");
-        return;
-      }
-
-      $("save").disabled = true;
-      message("Saving your profile...");
-
-      try {
-        await updateProfile(user, { displayName: name });
-
-        await setDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          name,
-          username,
-          bio,
-          email: user.email || "",
-          photoURL: user.photoURL || "",
-          provider: "google",
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-
-        $("heading").textContent = name;
-        message("Profile saved successfully!");
-      } catch (error) {
-        console.error(error);
-        message("Save failed: " + error.message);
-      } finally {
-        $("save").disabled = false;
-      }
-    });
-
-    $("logout").addEventListener("click", async () => {
-      try {
-        await signOut(auth);
-        if (window.google?.accounts?.id) {
-          google.accounts.id.disableAutoSelect();
-        }
-        message("You have signed out.");
-      } catch (error) {
-        message("Sign-out failed: " + error.message);
-      }
-    });
-
-    function initializeGoogle() {
-      if (!window.google?.accounts?.id) {
-        setTimeout(initializeGoogle, 300);
-        return;
-      }
-
-      google.accounts.id.initialize({
-        client_id: CLIENT_ID,
-        callback: handleCredentialResponse
-      });
-
-      google.accounts.id.renderButton(
-        $("google-button"),
-        { theme: "filled_black", size: "large", text: "signin_with" }
-      );
+    renderFeed();renderStats();renderAchievements();
+  } catch(e) {
+    console.error(e);
+    $("feed").innerHTML='<div class="card empty"><h2>Could not load the feed</h2><p>Check your Firestore database and security rules.</p><p>'+esc(e.message)+'</p></div>';
+  }
+}
+function renderFeed() {
+  if(!posts.length){$("feed").innerHTML='<div class="card empty"><div style="font-size:30px">✧</div><b>It’s quiet out here.</b><p>Be the first to share something.</p></div>';return;}
+  $("feed").innerHTML=posts.map(p=>{
+    const liked=(p.likes||[]).includes(user.uid), cs=comments.filter(c=>c.postId===p.id);
+    return `<article class="card">
+      <div class="post-head"><img class="avatar" src="${img(p.authorPhoto)}" alt=""><div><div class="post-name">${esc(p.authorName||"Orbit member")}</div><div class="meta">@${esc(p.authorUsername||"member")} · ${esc(time(p.createdAt))}</div></div></div>
+      <div class="post-text">${esc(p.text||"")}</div>
+      <div class="post-actions"><button class="${liked?"liked":""}" data-like="${esc(p.id)}">${liked?"♥":"♡"} ${(p.likes||[]).length} Like</button><button data-focus-comment="${esc(p.id)}">☷ ${cs.length} Comments</button>${p.uid===user.uid?`<button data-delete="${esc(p.id)}">Delete</button>`:""}</div>
+      <div>${cs.map(c=>`<div class="comment"><img class="avatar" src="${img(c.authorPhoto)}" alt=""><div class="comment-bubble"><b>${esc(c.authorName||"Member")}</b><p>${esc(c.text||"")}</p><div class="meta">${esc(time(c.createdAt))}</div></div></div>`).join("")}
+      <form class="comment-form" data-comment-form="${esc(p.id)}"><input name="comment" maxlength="500" required placeholder="Write a comment…"><button class="secondary">Reply</button></form></div>
+    </article>`;
+  }).join("");
+  document.querySelectorAll("[data-like]").forEach(b=>b.onclick=()=>toggleLike(b.dataset.like));
+  document.querySelectorAll("[data-focus-comment]").forEach(b=>b.onclick=()=>document.querySelector(`[data-comment-form="${CSS.escape(b.dataset.focusComment)}"] input`)?.focus());
+  document.querySelectorAll("[data-comment-form]").forEach(f=>f.addEventListener("submit",submitComment));
+  document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>removePost(b.dataset.delete));
+}
+async function toggleLike(id) {
+  const p=posts.find(p=>p.id===id);if(!p)return;
+  const likes=p.likes||[], next=likes.includes(user.uid)?likes.filter(x=>x!==user.uid):[...likes,user.uid];
+  try{await updateDoc(doc(db,"posts",id),{likes:next});p.likes=next;renderFeed();renderStats();renderAchievements();}
+  catch(e){console.error(e);say("Could not update like: "+e.message);}
+}
+async function submitComment(e) {
+  e.preventDefault();const form=e.currentTarget,id=form.dataset.commentForm,text=form.elements.comment.value.trim();if(!text)return;
+  const post=posts.find(p=>p.id===id);
+  try {
+    await addDoc(collection(db,"posts",id,"comments"),{uid:user.uid,authorName:name(),authorPhoto:profile.photoURL||user.photoURL||"",text,createdAt:serverTimestamp()});
+    if(post&&post.uid!==user.uid) {
+      await addDoc(collection(db,"users",post.uid,"notifications"),{type:"comment",fromUid:user.uid,fromName:name(),postId:id,text:"commented on your post",createdAt:serverTimestamp(),read:false});
     }
-
-    initializeGoogle();
-  </script>
+    say("Comment added!");await loadFeed();
+  }catch(e){console.error(e);say("Could not add comment: "+e.message);}
+}
+async function removePost(id) {
+  const p=posts.find(p=>p.id===id);if(!p||p.uid!==user.uid)return;
+  if(!confirm("Delete this post?"))return;
+  try{await deleteDoc(doc(db,"posts",id));say("Post deleted.");await loadFeed();}
+  catch(e){console.error(e);say("Could not delete post: "+e.message);}
+}
+function renderStats() {
+  if(!user)return;
+  const mine=posts.filter(p=>p.uid===user.uid);
+  const likes=mine.reduce((n,p)=>n+(p.likes?.length||0),0);
+  const replies=comments.filter(c=>c.uid===user.uid).length;
+  ["my-post-count","side-post-count"].forEach(id=>$(id).textContent=mine.length);
+  ["my-like-count","side-like-count"].forEach(id=>$(id).textContent=likes);
+  ["my-comment-count","side-comment-count"].forEach(id=>$(id).textContent=replies);
+}
+function achievementData() {
+  const mine=posts.filter(p=>p.uid===user?.uid);
+  const likes=mine.reduce((n,p)=>n+(p.likes?.length||0),0);
+  const replies=comments.filter(c=>c.uid===user?.uid).length;
+  return [
+    {icon:"🌱",name:"First Orbit",desc:"Publish your first post",ok:mine.length>=1},
+    {icon:"✍️",name:"Storyteller",desc:"Publish 5 posts",ok:mine.length>=5},
+    {icon:"💬",name:"Conversation Starter",desc:"Leave 3 comments",ok:replies>=3},
+    {icon:"💜",name:"Appreciated",desc:"Receive 10 likes",ok:likes>=10},
+    {icon:"🌟",name:"Regular",desc:"Publish 10 posts",ok:mine.length>=10}
+  ];
+}
+function renderAchievements() {
+  if(!user)return;
+  const data=achievementData();
+  $("achievement-list").innerHTML=data.map(a=>`<div class="achievement ${a.ok?"":"locked"}">${a.icon} <b>${a.ok?"✓ ":""}${a.name}</b><br><span class="muted">${a.desc}</span></div>`).join("");
+  $("side-achievements").innerHTML=data.filter(a=>a.ok).slice(0,3).map(a=>`<div class="achievement">${a.icon} ${a.name}</div>`).join("")||'<p class="muted">Your first badge is waiting ✧</p>';
+}
+async function loadNotifications() {
+  if(!user)return;const el=$("notifications-list");el.textContent="Loading…";
+  try {
+    const snap=await getDocs(query(collection(db,"users",user.uid,"notifications"),orderBy("createdAt","desc"),limit(30)));
+    if(snap.empty){el.innerHTML='<div class="empty"><div style="font-size:30px">♧</div><b>All quiet for now.</b><p>When someone comments on your post, it can appear here.</p></div>';return;}
+    el.innerHTML=snap.docs.map(d=>{const n=d.data();return `<div style="padding:12px 0;border-bottom:1px solid var(--border)"><b>${esc(n.fromName||"Someone")}</b> ${esc(n.text||"interacted with your post")}<div class="meta">${esc(time(n.createdAt))}</div></div>`}).join("");
+  }catch(e){console.error(e);el.innerHTML="Notifications could not load. Check Firestore rules.";}
+}
+</script>
 </body>
 </html>
