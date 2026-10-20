@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My Website</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
     body {
       margin: 0;
@@ -16,6 +17,7 @@
       color: white;
       font-family: Arial, sans-serif;
     }
+
     .card {
       width: 85%;
       max-width: 380px;
@@ -25,13 +27,38 @@
       border: 1px solid #303036;
       border-radius: 18px;
     }
+
     p { color: #aaaab5; }
-    #google-button { display: flex; justify-content: center; margin: 25px 0; }
-    #profile { display: none; overflow-wrap: anywhere; }
-    #avatar { width: 70px; height: 70px; border-radius: 50%; }
-    button { padding: 10px 20px; cursor: pointer; }
+
+    #google-button {
+      display: flex;
+      justify-content: center;
+      margin: 25px 0;
+    }
+
+    #profile {
+      display: none;
+      overflow-wrap: anywhere;
+    }
+
+    #avatar {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+    }
+
+    button {
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+
+    #status {
+      overflow-wrap: anywhere;
+      font-size: 13px;
+    }
   </style>
 </head>
+
 <body>
   <main class="card">
     <section id="welcome">
@@ -40,6 +67,7 @@
       <div id="google-button"></div>
       <p>Secure sign-in powered by Google</p>
     </section>
+
     <section id="profile">
       <h2>You're signed in!</h2>
       <img id="avatar" alt="Profile picture">
@@ -47,38 +75,156 @@
       <p id="email"></p>
       <button id="logout">Sign out</button>
     </section>
+
+    <p id="status" role="status"></p>
   </main>
-  <script>
-    const CLIENT_ID = "85380596885-7fjqj6betale7j83afkd6lhatt9oabqk.apps.googleusercontent.com";
 
-    function handleCredentialResponse(response) {
-      const payload = JSON.parse(
-        atob(response.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
-      );
-      document.getElementById("name").textContent = payload.name || "";
-      document.getElementById("email").textContent = payload.email || "";
-      document.getElementById("avatar").src = payload.picture || "";
-      document.getElementById("welcome").style.display = "none";
-      document.getElementById("profile").style.display = "block";
-    }
+  <script type="module">
+    import { initializeApp } from
+      "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
 
-    document.getElementById("logout").onclick = () => {
-      document.getElementById("profile").style.display = "none";
-      document.getElementById("welcome").style.display = "block";
-      google.accounts.id.disableAutoSelect();
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithCredential,
+      signOut,
+      onAuthStateChanged
+    } from
+      "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      serverTimestamp
+    } from
+      "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+    // Your Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBN_q_5tq-QlPKRuZNE0oecRRc4HkyqLQc",
+      authDomain: "myloginwebsite-69221.firebaseapp.com",
+      projectId: "myloginwebsite-69221",
+      storageBucket: "myloginwebsite-69221.firebasestorage.app",
+      messagingSenderId: "101628268619",
+      appId: "1:101628268619:web:0d3b4ed427ca6a016cbdce",
+      measurementId: "G-LZ9GJJVS07"
     };
 
-    window.addEventListener("load", () => {
+    // Your existing Google Web Client ID
+    const CLIENT_ID =
+      "85380596885-7fjqj6betale7j83afkd6lhatt9oabqk.apps.googleusercontent.com";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const welcome = document.getElementById("welcome");
+    const profile = document.getElementById("profile");
+    const status = document.getElementById("status");
+
+    function showProfile(user) {
+      document.getElementById("name").textContent =
+        user.displayName || "";
+      document.getElementById("email").textContent =
+        user.email || "";
+
+      const avatar = document.getElementById("avatar");
+      if (user.photoURL) {
+        avatar.src = user.photoURL;
+        avatar.style.display = "inline-block";
+      } else {
+        avatar.style.display = "none";
+      }
+
+      welcome.style.display = "none";
+      profile.style.display = "block";
+    }
+
+    // Google sign-in; Firebase verifies the credential.
+    async function handleCredentialResponse(response) {
+      status.textContent = "Signing in...";
+
+      try {
+        const googleCredential =
+          GoogleAuthProvider.credential(response.credential);
+
+        const result = await signInWithCredential(
+          auth,
+          googleCredential
+        );
+
+        const user = result.user;
+
+        // Save or update the user's profile in Firestore.
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          name: user.displayName || "",
+          email: user.email || "",
+          photoURL: user.photoURL || "",
+          provider: "google",
+          lastSignInAt: serverTimestamp()
+        }, { merge: true });
+
+        showProfile(user);
+        status.textContent = "Signed in! Your profile was saved.";
+      } catch (error) {
+        console.error("Sign-in/save error:", error);
+        status.textContent =
+          "Sign-in or save failed: " + error.message;
+      }
+    }
+
+    // Restore the Firebase login session if one exists.
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        showProfile(user);
+      } else {
+        profile.style.display = "none";
+        welcome.style.display = "block";
+      }
+    });
+
+    // Sign out of Firebase.
+    document.getElementById("logout").onclick = async () => {
+      try {
+        await signOut(auth);
+
+        if (window.google?.accounts?.id) {
+          google.accounts.id.disableAutoSelect();
+        }
+
+        status.textContent = "Signed out successfully.";
+      } catch (error) {
+        console.error(error);
+        status.textContent =
+          "Sign-out failed: " + error.message;
+      }
+    };
+
+    // Wait for Google's script to load before rendering its button.
+    function initializeGoogle() {
+      if (!window.google?.accounts?.id) {
+        setTimeout(initializeGoogle, 300);
+        return;
+      }
+
       google.accounts.id.initialize({
         client_id: CLIENT_ID,
         callback: handleCredentialResponse
       });
+
       google.accounts.id.renderButton(
         document.getElementById("google-button"),
-        { theme: "outline", size: "large", text: "signin_with" }
+        {
+          theme: "outline",
+          size: "large",
+          text: "signin_with"
+        }
       );
-    });
+    }
+
+    initializeGoogle();
   </script>
 </body>
 </html>
-
