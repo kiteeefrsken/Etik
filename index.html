@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Orbit — Your Space</title>
+<title>Etik — Your Space</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{--bg:#0b0d12;--panel:#141720;--panel2:#1a1e2a;--border:#292e3d;--text:#f4f5fb;--muted:#9da3b5;--accent:#a78bfa;--purple:#8b5cf6}
@@ -75,7 +75,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 
 <section id="signin">
   <div class="card signin-card">
-    <div class="brand">orb<span>it.</span></div>
+    <div class="brand">Etik<span>.</span></div>
     <div class="orb">✦</div>
     <h1 style="margin-top:20px">Your space on the internet.</h1>
     <p>Share thoughts, meet people, and make this little corner yours.</p>
@@ -85,7 +85,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 
 <div id="site" class="hidden">
 <header>
-  <div class="brand">orb<span>it.</span></div>
+  <div class="brand">Etik<span>.</span></div>
   <div class="head-actions">
     <button class="secondary" id="theme-toggle" title="Toggle theme">☼</button>
     <button class="secondary" id="notifications-btn" title="Notifications">♧</button>
@@ -112,7 +112,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
     <section id="view-home">
       <div class="card welcome">
         <h1>A little space<br>to be yourself.</h1>
-        <p>What's happening in your orbit today?</p>
+        <p>What's happening in your Etik today?</p>
         <button class="primary" id="focus-composer">Create a post ＋</button>
       </div>
 
@@ -169,7 +169,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
     <section id="view-achievements" class="hidden">
       <div class="card">
         <h2>Your achievements ✧</h2>
-        <p class="muted">Little milestones from being part of Orbit.</p>
+        <p class="muted">Little milestones from being part of Etik.</p>
         <div id="achievement-list"></div>
       </div>
     </section>
@@ -196,7 +196,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 
   <aside class="right">
     <div class="side">
-      <h2>Your orbit</h2>
+      <h2>Your Etik</h2>
       <b id="side-name"></b>
       <div class="muted" id="side-handle"></div>
       <div class="stats">
@@ -221,7 +221,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
   <button class="navitem" data-view="notifications">♧<br>Alerts</button>
   <button class="navitem" data-view="messages">✉<br>Messages</button>
 </nav>
-<footer>orbit. · Your space, your pace.</footer>
+<footer>Etik · Your space, your pace.</footer>
 </div>
 <div id="status" class="status hidden" role="status"></div>
 
@@ -265,7 +265,7 @@ function time(ts) {
     return d ? d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "just now";
   } catch { return "recently"; }
 }
-function name() { return profile.name || user?.displayName || "Orbit member"; }
+function name() { return profile.name || user?.displayName || "Etik member"; }
 function switchView(v) {
   document.querySelectorAll("[id^='view-']").forEach(el => el.classList.toggle("hidden", el.id !== "view-"+v));
   document.querySelectorAll("[data-view]").forEach(el => el.classList.toggle("active",el.dataset.view===v));
@@ -282,15 +282,15 @@ $("post-text").addEventListener("input",()=>{$("char-count").textContent=$("post
 $("theme-toggle").onclick=()=>{
   document.body.classList.toggle("light");
   $("theme-toggle").textContent=document.body.classList.contains("light")?"☾":"☼";
-  try{localStorage.setItem("orbit-theme",document.body.classList.contains("light")?"light":"dark")}catch{}
+  try{localStorage.setItem("etik-theme",document.body.classList.contains("light")?"light":"dark")}catch{}
 };
-try{if(localStorage.getItem("orbit-theme")==="light"){document.body.classList.add("light");$("theme-toggle").textContent="☾";}}catch{}
+try{if(localStorage.getItem("etik-theme")==="light"){document.body.classList.add("light");$("theme-toggle").textContent="☾";}}catch{}
 
 async function googleCredential(response) {
   say("Signing in…");
   try {
     await signInWithCredential(auth,GoogleAuthProvider.credential(response.credential));
-    say("Welcome to Orbit!");
+    say("Welcome to Etik!");
   } catch(e) {
     console.error(e); say("Sign-in failed: "+e.message);
   }
@@ -323,7 +323,7 @@ async function loadProfile() {
 }
 function renderProfile() {
   if(!user)return;
-  const photo=img(profile.photoURL||user.photoURL), n=name(), handle="@"+(profile.username||"orbit-member");
+  const photo=img(profile.photoURL||user.photoURL), n=name(), handle="@"+(profile.username||"etik-member");
   $("header-avatar").src=photo;$("profile-avatar").src=photo;
   $("header-name").textContent=n;$("side-name").textContent=n;
   $("side-handle").textContent=handle;$("profile-title").textContent=n;
@@ -381,7 +381,7 @@ function renderFeed() {
   $("feed").innerHTML=posts.map(p=>{
     const liked=(p.likes||[]).includes(user.uid), cs=comments.filter(c=>c.postId===p.id);
     return `<article class="card">
-      <div class="post-head"><img class="avatar" src="${img(p.authorPhoto)}" alt=""><div><div class="post-name">${esc(p.authorName||"Orbit member")}</div><div class="meta">@${esc(p.authorUsername||"member")} · ${esc(time(p.createdAt))}</div></div></div>
+      <div class="post-head"><img class="avatar" src="${img(p.authorPhoto)}" alt=""><div><div class="post-name">${esc(p.authorName||"Etik member")}</div><div class="meta">@${esc(p.authorUsername||"member")} · ${esc(time(p.createdAt))}</div></div></div>
       <div class="post-text">${esc(p.text||"")}</div>
       <div class="post-actions"><button class="${liked?"liked":""}" data-like="${esc(p.id)}">${liked?"♥":"♡"} ${(p.likes||[]).length} Like</button><button data-focus-comment="${esc(p.id)}">☷ ${cs.length} Comments</button>${p.uid===user.uid?`<button data-delete="${esc(p.id)}">Delete</button>`:""}</div>
       <div>${cs.map(c=>`<div class="comment"><img class="avatar" src="${img(c.authorPhoto)}" alt=""><div class="comment-bubble"><b>${esc(c.authorName||"Member")}</b><p>${esc(c.text||"")}</p><div class="meta">${esc(time(c.createdAt))}</div></div></div>`).join("")}
@@ -430,7 +430,7 @@ function achievementData() {
   const likes=mine.reduce((n,p)=>n+(p.likes?.length||0),0);
   const replies=comments.filter(c=>c.uid===user?.uid).length;
   return [
-    {icon:"🌱",name:"First Orbit",desc:"Publish your first post",ok:mine.length>=1},
+    {icon:"🌱",name:"First Etik",desc:"Publish your first post",ok:mine.length>=1},
     {icon:"✍️",name:"Storyteller",desc:"Publish 5 posts",ok:mine.length>=5},
     {icon:"💬",name:"Conversation Starter",desc:"Leave 3 comments",ok:replies>=3},
     {icon:"💜",name:"Appreciated",desc:"Receive 10 likes",ok:likes>=10},
