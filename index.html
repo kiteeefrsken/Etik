@@ -58,7 +58,6 @@ label{display:block;color:var(--muted);font-size:13px;margin:14px 0 6px}
 .cover{height:100px;border-radius:12px;background:linear-gradient(120deg,#8b5cf6,#38bdf8)}
 .profile-info{text-align:center;margin-top:-43px}
 .profile-info img{width:82px;height:82px;border:4px solid var(--panel)}
-.field{margin-bottom:12px}
 .status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:20;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;max-width:90%;overflow-wrap:anywhere}
 #signin{min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(ellipse at top,#8b5cf626,transparent 60%),var(--bg)}
 .signin-card{width:min(100%,450px);text-align:center;padding:35px}
@@ -75,7 +74,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 
 <section id="signin">
   <div class="card signin-card">
-    <div class="brand">Etik<span>.</span></div>
+    <div class="brand">et<span>ik.</span></div>
     <div class="orb">✦</div>
     <h1 style="margin-top:20px">Your space on the internet.</h1>
     <p>Share thoughts, meet people, and make this little corner yours.</p>
@@ -85,7 +84,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 
 <div id="site" class="hidden">
 <header>
-  <div class="brand">Etik<span>.</span></div>
+  <div class="brand">et<span>ik.</span></div>
   <div class="head-actions">
     <button class="secondary" id="theme-toggle" title="Toggle theme">☼</button>
     <button class="secondary" id="notifications-btn" title="Notifications">♧</button>
@@ -102,6 +101,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
       <button class="navitem" data-view="profile">◉ My profile</button>
       <button class="navitem" data-view="achievements">✧ Achievements</button>
       <button class="navitem" data-view="notifications">♧ Notifications</button>
+      <button class="navitem" data-view="friends">♧ Friends</button>
       <button class="navitem" data-view="messages">✉ Messages</button>
       <hr style="border-color:var(--border);margin-top:18px">
       <p class="muted" style="font-size:12px">YOUR SPACE, YOUR RULES ✦</p>
@@ -112,10 +112,9 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
     <section id="view-home">
       <div class="card welcome">
         <h1>A little space<br>to be yourself.</h1>
-        <p>What's happening in your Etik today?</p>
+        <p>What's happening in your etik today?</p>
         <button class="primary" id="focus-composer">Create a post ＋</button>
       </div>
-
       <div class="card" id="composer-card">
         <h2>Share something</h2>
         <form id="post-form">
@@ -126,7 +125,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
           </div>
         </form>
       </div>
-
       <div class="title-row">
         <h2>Your feed</h2>
         <button class="secondary" id="refresh-feed">↻ Refresh</button>
@@ -151,6 +149,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
           <input id="displayName" maxlength="80" required>
           <label for="username">Username</label>
           <input id="username" maxlength="30" placeholder="cooluser">
+          <label for="photoURL">Profile picture URL (optional)</label>
+          <input id="photoURL" type="url" maxlength="1000" placeholder="https://example.com/photo.jpg">
           <label for="bio">About me</label>
           <textarea id="bio" maxlength="300" placeholder="Write something about yourself…"></textarea>
           <button class="primary" id="save-profile" style="margin-top:14px">Save changes</button>
@@ -182,21 +182,26 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
       </div>
     </section>
 
-    <section id="view-messages" class="hidden">
+    <section id="view-friends" class="hidden">
       <div class="card">
-        <h2>Messages ✉</h2>
-        <div class="empty">
-          <div style="font-size:32px">✉</div>
-          <b>Good conversations start here.</b>
-          <p class="muted">Private messaging needs an additional secure Firestore implementation and is not enabled yet.</p>
-        </div>
+        <h2>Find people ♧</h2>
+        <p class="muted">Search by exact username. Only public profile details are shown.</p>
+        <form id="user-search-form" class="comment-form"><input id="user-search" minlength="3" maxlength="30" required placeholder="Enter exact username"><button class="primary">Search</button></form>
+        <div id="user-search-results"></div>
       </div>
+      <div class="card"><h2>Friend requests</h2><div id="friend-requests" class="muted">Loading…</div></div>
+      <div class="card"><h2>Your friends</h2><div id="friends-list" class="muted">Loading…</div></div>
+    </section>
+
+    <section id="view-messages" class="hidden">
+      <div class="card"><h2>Messages ✉</h2><p class="muted">Choose a friend to open a private chat.</p><div id="chat-friends"></div></div>
+      <div class="card hidden" id="chat-panel"><div class="title-row"><h2 id="chat-title">Chat</h2><button class="secondary" id="close-chat">Back</button></div><div id="chat-messages" style="max-height:380px;overflow:auto"></div><form id="message-form" class="comment-form"><input id="message-text" maxlength="2000" required placeholder="Write a message…"><button class="primary">Send</button></form></div>
     </section>
   </main>
 
   <aside class="right">
     <div class="side">
-      <h2>Your Etik</h2>
+      <h2>Your etik</h2>
       <b id="side-name"></b>
       <div class="muted" id="side-handle"></div>
       <div class="stats">
@@ -219,16 +224,17 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
   <button class="navitem" data-view="profile">◉<br>Profile</button>
   <button class="navitem" data-view="achievements">✧<br>Badges</button>
   <button class="navitem" data-view="notifications">♧<br>Alerts</button>
+  <button class="navitem" data-view="friends">♧<br>Friends</button>
   <button class="navitem" data-view="messages">✉<br>Messages</button>
 </nav>
-<footer>Etik · Your space, your pace.</footer>
+<footer>etik. · Your space, your pace.</footer>
 </div>
 <div id="status" class="status hidden" role="status"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, query, orderBy, limit, getDocs, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, collection, query, orderBy, limit, getDocs, updateDoc, deleteDoc, serverTimestamp, where, documentId } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBN_q_5tq-QlPKRuZNE0oecRRc4HkyqLQc",
@@ -272,6 +278,7 @@ function switchView(v) {
   if(v==="profile") renderProfile();
   if(v==="achievements") renderAchievements();
   if(v==="notifications") loadNotifications();
+  if(v==="friends"||v==="messages") loadFriends();
 }
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));
 document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.goto)));
@@ -306,7 +313,7 @@ onAuthStateChanged(auth,async current=>{
   user=current;
   if(!user){$("signin").classList.remove("hidden");$("site").classList.add("hidden");return;}
   $("signin").classList.add("hidden");$("site").classList.remove("hidden");
-  await loadProfile(); await loadFeed();
+  await loadProfile(); await loadFeed(); await loadFriends();
 });
 
 async function loadProfile() {
@@ -317,6 +324,7 @@ async function loadProfile() {
     await setDoc(ref,{uid:user.uid,name:profile.name,email:profile.email,photoURL:profile.photoURL,provider:"google",createdAt:saved.createdAt||serverTimestamp(),lastSignInAt:serverTimestamp()},{merge:true});
     $("displayName").value=profile.name;
     $("username").value=profile.username;
+    $("photoURL").value=profile.photoURL||"";
     $("bio").value=profile.bio;
     renderProfile();
   } catch(e) { console.error(e);say("Could not load profile: "+e.message); }
@@ -333,17 +341,88 @@ function renderProfile() {
 }
 $("profile-form").addEventListener("submit",async e=>{
   e.preventDefault(); if(!user)return;
-  const n=$("displayName").value.trim(), u=$("username").value.trim(), b=$("bio").value.trim();
+  const n=$("displayName").value.trim(), u=$("username").value.trim(), b=$("bio").value.trim(), photo=$("photoURL").value.trim();
   if(!n)return say("Please enter a display name.");
   if(u&&!/^[a-zA-Z0-9_]{3,30}$/.test(u))return say("Username must be 3–30 letters, numbers or underscores.");
   $("save-profile").disabled=true;
   try{
-    await updateProfile(user,{displayName:n});
-    await setDoc(doc(db,"users",user.uid),{uid:user.uid,name:n,username:u,bio:b,email:user.email||"",photoURL:user.photoURL||"",provider:"google",updatedAt:serverTimestamp()},{merge:true});
-    profile={...profile,name:n,username:u,bio:b};renderProfile();say("Profile saved!");
+    await updateProfile(user,{displayName:n, ...(photo?{photoURL:photo}:{})});
+    await setDoc(doc(db,"users",user.uid),{uid:user.uid,name:n,username:u,bio:b,email:user.email||"",photoURL:photo||user.photoURL||"",provider:"google",updatedAt:serverTimestamp()},{merge:true});
+    profile={...profile,name:n,username:u,bio:b,photoURL:photo||user.photoURL||""};renderProfile();say("Profile saved!");
   }catch(e){console.error(e);say("Save failed: "+e.message);}
   finally{$("save-profile").disabled=false;}
 });
+
+// Friends and private messages. Firestore Rules must be deployed before using these features.
+function pairId(a,b){return [a,b].sort().join("_");}
+async function findUserByUsername(q){
+  const snap=await getDocs(query(collection(db,"users"),where("username","==",q),limit(10)));
+  return snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.id!==user.uid);
+}
+$("user-search-form").addEventListener("submit",async e=>{
+  e.preventDefault();const q=$("user-search").value.trim().replace(/^@/,"");
+  const out=$("user-search-results");out.textContent="Searching…";
+  try{const results=await findUserByUsername(q);out.innerHTML=results.length?results.map(x=>`<div class="row"><div><b>${safeText(x.name||"Etik member")}</b><div class="meta">@${safeText(x.username||"")}</div></div><button class="secondary" data-add-friend="${safeText(x.id)}">Add friend</button></div>`).join(""):'<p class="muted">No matching user found.</p>';out.querySelectorAll('[data-add-friend]').forEach(b=>b.onclick=()=>sendFriendRequest(b.dataset.addFriend));}
+  catch(e){console.error(e);out.textContent="Search failed. Check your Firestore rules.";}
+});
+async function sendFriendRequest(toUid){
+  if(!user||toUid===user.uid)return;
+  try{
+    const existing=await getDocs(query(collection(db,"friendRequests"),where("fromUid","==",user.uid),where("toUid","==",toUid),where("status","==","pending"),limit(1)));
+    if(!existing.empty)return say("You already sent a request.");
+    const reverse=await getDocs(query(collection(db,"friendRequests"),where("fromUid","==",toUid),where("toUid","==",user.uid),where("status","==","pending"),limit(1)));
+    if(!reverse.empty){say("They already sent you a request. Accept it below.");await loadFriends();return;}
+    await addDoc(collection(db,"friendRequests"),{fromUid:user.uid,toUid,status:"pending",createdAt:serverTimestamp()});say("Friend request sent!");await loadFriends();
+  }catch(e){console.error(e);say("Could not send request: "+e.message);}
+}
+async function loadFriends(){
+ if(!user)return;
+ try{
+  const [incoming,outgoing,friendships]=await Promise.all([
+   getDocs(query(collection(db,"friendRequests"),where("toUid","==",user.uid),where("status","==","pending"),limit(50))),
+   getDocs(query(collection(db,"friendRequests"),where("fromUid","==",user.uid),where("status","==","pending"),limit(50))),
+   getDocs(query(collection(db,"friendships"),where("memberUids","array-contains",user.uid),limit(50)))
+  ]);
+  const requestRows=await Promise.all(incoming.docs.map(async d=>{const r=d.data();let p={};try{const s=await getDoc(doc(db,"users",r.fromUid));if(s.exists())p=s.data();}catch{}return `<div class="row"><div><b>${safeText(p.name||"Etik member")}</b><div class="meta">Wants to be your friend</div></div><span><button class="primary" data-accept="${d.id}">Accept</button> <button class="secondary" data-decline="${d.id}">Decline</button></span></div>`;}));
+  $("friend-requests").innerHTML=requestRows.join("")||'<p class="muted">No incoming requests.</p>';
+  $("friend-requests").querySelectorAll("[data-accept]").forEach(b=>b.onclick=()=>respondRequest(b.dataset.accept,true));
+  $("friend-requests").querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>respondRequest(b.dataset.decline,false));
+  const friendRows=await Promise.all(friendships.docs.map(async d=>{const members=d.data().memberUids||[],id=members.find(x=>x!==user.uid);if(!id)return "";let p={};try{const s=await getDoc(doc(db,"users",id));if(s.exists())p=s.data();}catch{}return `<div class="row"><div><b>${safeText(p.name||"Etik member")}</b><div class="meta">@${safeText(p.username||"member")}</div></div><button class="secondary" data-chat="${safeText(id)}">Message</button></div>`;}));
+  $("friends-list").innerHTML=friendRows.join("")||'<p class="muted">No friends yet. Search for someone above.</p>';
+  $("chat-friends").innerHTML=friendRows.join("")||'<p class="muted">Add friends to start chatting.</p>';
+  $("friends-list").querySelectorAll("[data-chat]").forEach(b=>b.onclick=()=>{switchView("messages");openChat(b.dataset.chat);});
+  $("chat-friends").querySelectorAll("[data-chat]").forEach(b=>b.onclick=()=>openChat(b.dataset.chat));
+ }catch(e){console.error(e);$("friend-requests").textContent="Could not load friends. Check the Firestore rules and indexes.";}
+}
+async function respondRequest(id,accept){
+ try{
+  const ref=doc(db,"friendRequests",id), snap=await getDoc(ref);if(!snap.exists())return;
+  const r=snap.data();if(r.toUid!==user.uid||r.status!=="pending")return say("This request is no longer available.");
+  await updateDoc(ref,{status:accept?"accepted":"declined",respondedAt:serverTimestamp()});
+  if(accept){const memberUids=[r.fromUid,r.toUid].sort();await setDoc(doc(db,"friendships",pairId(...memberUids)),{memberUids,createdAt:serverTimestamp()});say("Friend request accepted!");}else say("Request declined.");
+  await loadFriends();
+ }catch(e){console.error(e);say("Could not update request: "+e.message);}
+}
+let activeChat=null;
+async function openChat(otherUid){
+ try{
+  const snap=await getDoc(doc(db,"users",otherUid));if(!snap.exists())return say("User not found.");
+  const friendship=await getDoc(doc(db,"friendships",pairId(user.uid,otherUid)));if(!friendship.exists())return say("You can only message friends.");
+  activeChat=pairId(user.uid,otherUid);$("chat-title").textContent=snap.data().name||"Chat";$("chat-panel").classList.remove("hidden");$("chat-messages").textContent="Loading messages…";
+  const messages=await getDocs(query(collection(db,"conversations",activeChat,"messages"),orderBy("createdAt","asc"),limit(100)));
+  $("chat-messages").innerHTML=messages.empty?'<p class="muted">Say hello to start the conversation.</p>':messages.docs.map(d=>{const m=d.data();return `<div class="card" style="padding:10px;margin:8px 0"><b>${m.senderUid===user.uid?"You":safeText(snap.data().name||"Friend")}</b><p style="margin:4px 0;white-space:pre-wrap">${safeText(m.text)}</p><div class="meta">${safeText(time(m.createdAt))}</div></div>`}).join("");
+  $("chat-messages").scrollTop=$("chat-messages").scrollHeight;
+ }catch(e){console.error(e);say("Could not open chat: "+e.message);}
+}
+$("close-chat").onclick=()=>{$("chat-panel").classList.add("hidden");activeChat=null;};
+$("message-form").addEventListener("submit",async e=>{
+ e.preventDefault();const text=$("message-text").value.trim();if(!text||!activeChat)return;
+ try{const f=await getDoc(doc(db,"friendships",activeChat));if(!f.exists()||!(f.data().memberUids||[]).includes(user.uid))throw new Error("You are not a member of this chat.");
+  await addDoc(collection(db,"conversations",activeChat,"messages"),{senderUid:user.uid,text,createdAt:serverTimestamp()});$("message-text").value="";
+  const other=(f.data().memberUids||[]).find(x=>x!==user.uid);await openChat(other);
+ }catch(err){console.error(err);say("Message failed: "+err.message);}
+});
+
 $("logout").onclick=async()=>{try{await signOut(auth);window.google?.accounts?.id?.disableAutoSelect();say("Signed out.");}catch(e){say("Sign-out failed: "+e.message);}};
 
 $("post-form").addEventListener("submit",async e=>{
