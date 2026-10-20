@@ -4,80 +4,170 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My Website</title>
+  <title>My Account</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-
   <style>
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: #0d0d0f;
-      color: white;
+      background: #0b0d12;
+      color: #f4f4f5;
       font-family: Arial, sans-serif;
     }
 
-    .card {
-      width: 85%;
-      max-width: 380px;
-      padding: 35px 25px;
-      text-align: center;
-      background: #18181c;
-      border: 1px solid #303036;
-      border-radius: 18px;
-    }
-
-    p { color: #aaaab5; }
-
-    #google-button {
+    nav {
+      padding: 20px 7%;
+      border-bottom: 1px solid #242631;
       display: flex;
-      justify-content: center;
-      margin: 25px 0;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    #profile {
-      display: none;
-      overflow-wrap: anywhere;
+    .brand { font-size: 21px; font-weight: bold; }
+    .accent { color: #a78bfa; }
+
+    main {
+      width: 92%;
+      max-width: 760px;
+      margin: 45px auto;
+    }
+
+    .card {
+      background: #151720;
+      border: 1px solid #292c39;
+      border-radius: 18px;
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    h1 { margin-top: 0; font-size: 28px; }
+    p { color: #a5a7b4; line-height: 1.6; }
+
+    input, textarea {
+      display: block;
+      width: 100%;
+      margin: 8px 0 18px;
+      padding: 13px;
+      background: #0d0f16;
+      color: white;
+      border: 1px solid #343746;
+      border-radius: 9px;
+      font: inherit;
+    }
+
+    textarea { min-height: 95px; resize: vertical; }
+
+    label { font-size: 14px; color: #d4d4dc; }
+
+    button {
+      padding: 12px 17px;
+      border: 0;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .primary { background: #8b5cf6; color: white; }
+    .secondary { background: #292c39; color: white; }
+    .danger { background: #3b2028; color: #ffb6c1; }
+
+    button:disabled { opacity: .6; cursor: wait; }
+
+    .profile-head {
+      display: flex;
+      align-items: center;
+      gap: 17px;
+      margin-bottom: 24px;
     }
 
     #avatar {
-      width: 70px;
-      height: 70px;
+      width: 76px;
+      height: 76px;
+      object-fit: cover;
       border-radius: 50%;
+      background: #292c39;
     }
 
-    button {
-      padding: 10px 20px;
-      cursor: pointer;
-    }
+    #email { overflow-wrap: anywhere; }
+    #status { font-size: 14px; overflow-wrap: anywhere; }
+    #app { display: none; }
+    #google-button { margin-top: 22px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .muted { font-size: 13px; }
 
-    #status {
-      overflow-wrap: anywhere;
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #777b8b;
       font-size: 13px;
     }
   </style>
 </head>
-
 <body>
-  <main class="card">
-    <section id="welcome">
-      <h1>Welcome</h1>
-      <p>Sign in to continue to my website.</p>
+  <nav>
+    <div class="brand">My<span class="accent">Account</span></div>
+    <span class="muted">Your personal space</span>
+  </nav>
+
+  <main>
+    <section id="welcome" class="card">
+      <h1>Welcome 👋</h1>
+      <p>Sign in to open your personal dashboard.</p>
       <div id="google-button"></div>
-      <p>Secure sign-in powered by Google</p>
     </section>
 
-    <section id="profile">
-      <h2>You're signed in!</h2>
-      <img id="avatar" alt="Profile picture">
-      <h3 id="name"></h3>
-      <p id="email"></p>
-      <button id="logout">Sign out</button>
-    </section>
+    <div id="app">
+      <section class="card">
+        <div class="profile-head">
+          <img id="avatar" alt="Profile picture">
+          <div>
+            <h1 id="heading">Your dashboard</h1>
+            <p id="email"></p>
+          </div>
+        </div>
+        <p>Welcome to your account. You can update your profile below.</p>
+      </section>
+
+      <section class="card">
+        <h2>Edit profile</h2>
+        <p>Customize how your profile appears on this website.</p>
+
+        <form id="profile-form">
+          <label for="displayName">Display name</label>
+          <input id="displayName" maxlength="80" required>
+
+          <label for="username">Username</label>
+          <input id="username" maxlength="30"
+                 placeholder="e.g. cooluser">
+
+          <label for="bio">About me</label>
+          <textarea id="bio" maxlength="300"
+                    placeholder="Write something about yourself..."></textarea>
+
+          <button id="save" class="primary" type="submit">
+            Save changes
+          </button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Account</h2>
+        <p>Your account is connected through Google.</p>
+        <div class="actions">
+          <button id="logout" class="danger" type="button">
+            Sign out
+          </button>
+        </div>
+      </section>
+    </div>
 
     <p id="status" role="status"></p>
   </main>
+
+  <footer>MyAccount · Your profile, your space.</footer>
 
   <script type="module">
     import { initializeApp } from
@@ -88,19 +178,20 @@
       GoogleAuthProvider,
       signInWithCredential,
       signOut,
-      onAuthStateChanged
+      onAuthStateChanged,
+      updateProfile
     } from
       "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
     import {
       getFirestore,
       doc,
+      getDoc,
       setDoc,
       serverTimestamp
     } from
       "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-    // Your Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyBN_q_5tq-QlPKRuZNE0oecRRc4HkyqLQc",
       authDomain: "myloginwebsite-69221.firebaseapp.com",
@@ -111,7 +202,6 @@
       measurementId: "G-LZ9GJJVS07"
     };
 
-    // Your existing Google Web Client ID
     const CLIENT_ID =
       "101628268619-kvnkedv0iuh7kj13f8ek92ncemt5srfn.apps.googleusercontent.com";
 
@@ -119,90 +209,135 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    const welcome = document.getElementById("welcome");
-    const profile = document.getElementById("profile");
-    const status = document.getElementById("status");
+    const $ = id => document.getElementById(id);
+    let loadingProfile = false;
 
-    function showProfile(user) {
-      document.getElementById("name").textContent =
-        user.displayName || "";
-      document.getElementById("email").textContent =
-        user.email || "";
-
-      const avatar = document.getElementById("avatar");
-      if (user.photoURL) {
-        avatar.src = user.photoURL;
-        avatar.style.display = "inline-block";
-      } else {
-        avatar.style.display = "none";
-      }
-
-      welcome.style.display = "none";
-      profile.style.display = "block";
+    function message(text) {
+      $("status").textContent = text;
     }
 
-    // Google sign-in; Firebase verifies the credential.
-    async function handleCredentialResponse(response) {
-      status.textContent = "Signing in...";
+    function showDashboard(user) {
+      $("welcome").style.display = "none";
+      $("app").style.display = "block";
+      $("heading").textContent = user.displayName || "Your dashboard";
+      $("email").textContent = user.email || "";
 
+      $("avatar").src = user.photoURL ||
+        "https://www.gravatar.com/avatar/?d=mp";
+    }
+
+    async function handleCredentialResponse(response) {
+      message("Signing in...");
       try {
-        const googleCredential =
+        const credential =
           GoogleAuthProvider.credential(response.credential);
 
-        const result = await signInWithCredential(
-          auth,
-          googleCredential
-        );
+        await signInWithCredential(auth, credential);
+        message("Signed in successfully!");
+      } catch (error) {
+        console.error(error);
+        message("Sign-in failed: " + error.message);
+      }
+    }
 
-        const user = result.user;
+    onAuthStateChanged(auth, async user => {
+      if (!user) {
+        $("app").style.display = "none";
+        $("welcome").style.display = "block";
+        return;
+      }
 
-        // Save or update the user's profile in Firestore.
-        await setDoc(doc(db, "users", user.uid), {
+      showDashboard(user);
+      if (loadingProfile) return;
+      loadingProfile = true;
+
+      try {
+        const ref = doc(db, "users", user.uid);
+        const snapshot = await getDoc(ref);
+        const saved = snapshot.exists() ? snapshot.data() : {};
+
+        $("displayName").value =
+          saved.name || user.displayName || "";
+        $("username").value = saved.username || "";
+        $("bio").value = saved.bio || "";
+
+        // Create a profile for users signing in for the first time.
+        await setDoc(ref, {
           uid: user.uid,
-          name: user.displayName || "",
+          name: saved.name || user.displayName || "",
           email: user.email || "",
           photoURL: user.photoURL || "",
           provider: "google",
+          createdAt: saved.createdAt || serverTimestamp(),
           lastSignInAt: serverTimestamp()
         }, { merge: true });
 
-        showProfile(user);
-        status.textContent = "Signed in! Your profile was saved.";
       } catch (error) {
-        console.error("Sign-in/save error:", error);
-        status.textContent =
-          "Sign-in or save failed: " + error.message;
-      }
-    }
-
-    // Restore the Firebase login session if one exists.
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        showProfile(user);
-      } else {
-        profile.style.display = "none";
-        welcome.style.display = "block";
+        console.error(error);
+        message("Could not load profile: " + error.message);
+      } finally {
+        loadingProfile = false;
       }
     });
 
-    // Sign out of Firebase.
-    document.getElementById("logout").onclick = async () => {
+    $("profile-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const name = $("displayName").value.trim();
+      const username = $("username").value.trim();
+      const bio = $("bio").value.trim();
+
+      if (!name) {
+        message("Please enter a display name.");
+        return;
+      }
+
+      if (username && !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+        message("Username must be 3–30 characters: letters, numbers or underscores.");
+        return;
+      }
+
+      $("save").disabled = true;
+      message("Saving your profile...");
+
+      try {
+        await updateProfile(user, { displayName: name });
+
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          name,
+          username,
+          bio,
+          email: user.email || "",
+          photoURL: user.photoURL || "",
+          provider: "google",
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        $("heading").textContent = name;
+        message("Profile saved successfully!");
+      } catch (error) {
+        console.error(error);
+        message("Save failed: " + error.message);
+      } finally {
+        $("save").disabled = false;
+      }
+    });
+
+    $("logout").addEventListener("click", async () => {
       try {
         await signOut(auth);
-
         if (window.google?.accounts?.id) {
           google.accounts.id.disableAutoSelect();
         }
-
-        status.textContent = "Signed out successfully.";
+        message("You have signed out.");
       } catch (error) {
-        console.error(error);
-        status.textContent =
-          "Sign-out failed: " + error.message;
+        message("Sign-out failed: " + error.message);
       }
-    };
+    });
 
-    // Wait for Google's script to load before rendering its button.
     function initializeGoogle() {
       if (!window.google?.accounts?.id) {
         setTimeout(initializeGoogle, 300);
@@ -215,12 +350,8 @@
       });
 
       google.accounts.id.renderButton(
-        document.getElementById("google-button"),
-        {
-          theme: "outline",
-          size: "large",
-          text: "signin_with"
-        }
+        $("google-button"),
+        { theme: "filled_black", size: "large", text: "signin_with" }
       );
     }
 
