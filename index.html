@@ -94,7 +94,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 </head>
 
 <body>
-
 <section id="signin">
   <div class="card signin-card">
     <div class="brand">et<span>ik.</span></div>
@@ -331,14 +330,6 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-import {
-  getStorage,
-  ref as storageRef,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject
-} from "https://www.gstatic.com/firebasejs/12.5.0/firebase-storage.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyBN_q_5tq-QlPKRuZNE0oecRRc4HkyqLQc",
   authDomain: "myloginwebsite-69221.firebaseapp.com",
@@ -354,7 +345,6 @@ const CLIENT_ID = "85380596885-7fjqj6betale7j83afkd6lhatt9oabqk.apps.googleuserc
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
 const $ = id => document.getElementById(id);
 const fallback = "https://www.gravatar.com/avatar/?d=mp";
@@ -385,7 +375,6 @@ function esc(s = "") {
   }[c]));
 }
 
-// Used by existing friends and chat rendering.
 function safeText(s = "") {
   return esc(s);
 }
@@ -587,6 +576,52 @@ function renderProfile() {
   renderStats();
 }
 
+// COMPRESS PROFILE PICTURES FOR FIRESTORE
+async function compressProfilePhoto(file) {
+  const imageURL = URL.createObjectURL(file);
+
+  try {
+    const image = new Image();
+
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error("Could not read this image."));
+      image.src = imageURL;
+    });
+
+    const canvas = document.createElement("canvas");
+    const maxDimension = 600;
+
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(image.width, image.height)
+    );
+
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Image compression is not supported.");
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    for (const quality of [0.75, 0.6, 0.45, 0.3, 0.2]) {
+      const dataURL = canvas.toDataURL("image/jpeg", quality);
+
+      // Keep enough room for the other profile fields in Firestore.
+      if (dataURL.length <= 700000) {
+        return dataURL;
+      }
+    }
+
+    throw new Error(
+      "This picture is too large after compression. Please choose another."
+    );
+  } finally {
+    URL.revokeObjectURL(imageURL);
+  }
+}
+
 // PROFILE PHOTO: GALLERY AND CAMERA
 $("choose-gallery").onclick = () => {
   $("gallery-file").click();
@@ -639,13 +674,12 @@ function handleSelectedPhoto(file) {
 
   $("photo-preview").src = selectedPhotoPreviewURL;
   $("photo-upload-status").textContent =
-    file.name + " — ready to upload when you save.";
+    file.name + " — ready to save.";
   $("cancel-photo").classList.remove("hidden");
 
-  // Clear the URL field because the selected file takes priority.
   $("photoURL").value = "";
 
-  say("Picture selected. Click Save changes to upload it.");
+  say("Picture selected. Click Save changes to save it.");
 }
 
 $("gallery-file").addEventListener("change", e => {
@@ -664,7 +698,7 @@ $("cancel-photo").onclick = () => {
   say("Picture selection cancelled.");
 };
 
-// PROFILE SAVE
+// PROFILE SAVE — USES FIRESTORE, NOT FIREBASE STORAGE
 $("profile-form").addEventListener("submit", async e => {
   e.preventDefault();
   if (!user) return;
@@ -683,6 +717,7 @@ $("profile-form").addEventListener("submit", async e => {
   if (typedPhotoURL) {
     try {
       const parsed = new URL(typedPhotoURL);
+
       if (!["https:", "http:"].includes(parsed.protocol)) {
         return say("Please enter a valid image URL.");
       }
@@ -693,33 +728,23 @@ $("profile-form").addEventListener("submit", async e => {
 
   const saveButton = $("save-profile");
   saveButton.disabled = true;
-  $("photo-upload-status").textContent = selectedPhotoFile
-    ? "Uploading your picture…"
-    : "Saving your profile…";
 
   try {
     let finalPhotoURL = currentPhotoURL;
 
-    // Upload a newly selected image to Firebase Storage.
     if (selectedPhotoFile) {
-      const file = selectedPhotoFile;
-      const imageRef = storageRef(
-        storage,
-        `users/${user.uid}/profile/profile-picture`
-      );
-
-      await uploadBytes(imageRef, file, {
-        contentType: file.type
-      });
-
-      finalPhotoURL = await getDownloadURL(imageRef);
+      $("photo-upload-status").textContent = "Compressing picture…";
+      finalPhotoURL = await compressProfilePhoto(selectedPhotoFile);
     } else if (typedPhotoURL) {
       finalPhotoURL = typedPhotoURL;
     }
 
+    $("photo-upload-status").textContent = "Saving your profile…";
+
+    // Update the display name in Firebase Authentication.
+    // The profile photo itself is stored in Firestore.
     await updateProfile(user, {
-      displayName: n,
-      photoURL: finalPhotoURL || null
+      displayName: n
     });
 
     await setDoc(doc(db, "users", user.uid), {
