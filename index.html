@@ -76,6 +76,10 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 .photo-preview-wrap{display:flex;align-items:center;gap:14px;margin-top:12px;flex-wrap:wrap}
 #photo-preview{width:92px;height:92px;border-radius:50%;object-fit:cover;border:3px solid var(--border);background:var(--panel2)}
 .photo-help{font-size:12px;color:var(--muted);margin-top:8px}
+.presence{font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px}
+.online-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px}
+.typing{min-height:18px;font-size:12px;color:var(--muted);padding:4px 2px}
+.read-receipt{font-size:11px;color:var(--accent);text-align:right;margin-top:2px}
 @media(max-width:950px){.layout{grid-template-columns:175px minmax(0,1fr)}.right{display:none}}
 @media(max-width:650px){
   header{height:60px;padding:0 12px}
@@ -252,10 +256,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
       </div>
       <div class="card hidden" id="chat-panel">
         <div class="title-row">
-          <h2 id="chat-title">Chat</h2>
+          <div><h2 id="chat-title">Chat</h2><div id="chat-presence" class="presence">Checking status…</div></div>
           <button class="secondary" id="close-chat">Back</button>
         </div>
         <div id="chat-messages" style="max-height:380px;overflow:auto"></div>
+        <div id="typing-indicator" class="typing"></div>
         <form id="message-form" class="comment-form">
           <input id="message-text" maxlength="2000" required placeholder="Write a message…">
           <button class="primary">Send</button>
@@ -324,6 +329,7 @@ import {
   orderBy,
   limit,
   getDocs,
+  onSnapshot,
   updateDoc,
   deleteDoc,
   serverTimestamp,
@@ -357,6 +363,15 @@ let timer;
 let selectedPhotoFile = null;
 let selectedPhotoPreviewURL = null;
 let currentPhotoURL = "";
+let presenceTimer = null;
+let friendsRefreshTimer = null;
+let messagesUnsubscribe = null;
+let otherPresenceUnsubscribe = null;
+let conversationUnsubscribe = null;
+let typingTimeout = null;
+let lastTypingWrite = 0;
+let activeOtherUid = null;
+const PRESENCE_ONLINE_WINDOW_MS = 150000;
 
 function say(message) {
   $("status").textContent = message;
@@ -501,6 +516,8 @@ onAuthStateChanged(auth, async current => {
   user = current;
 
   if (!user) {
+    stopPresenceTimers();
+    stopChatListeners();
     $("signin").classList.remove("hidden");
     $("site").classList.add("hidden");
     return;
@@ -510,9 +527,79 @@ onAuthStateChanged(auth, async current => {
   $("site").classList.remove("hidden");
 
   await loadProfile();
+  await setPresenceOnline();
+  startPresenceTimers();
   await loadFeed();
   await loadFriends();
 });
+
+// PRESENCE: Firestore heartbeat approximation (not instant disconnect detection)
+async function setPresenceOnline() {
+  if (!user) return;
+  try {
+    await setDoc(doc(db, "users", user.uid), {
+      online: true,
+      lastActiveAt: serverTimestamp()
+    }, { merge: true });
+  } catch (e) { console.warn("Presence update failed", e); }
+}
+
+async function setPresenceOffline() {
+  if (!user) return;
+  try {
+    await setDoc(doc(db, "users", user.uid), {
+      online: false,
+      lastSeenAt: serverTimestamp()
+    }, { merge: true });
+  } catch (e) { console.warn("Offline status update failed", e); }
+}
+
+function startPresenceTimers() {
+  stopPresenceTimers();
+  presenceTimer = setInterval(() => {
+    if (document.visibilityState === "visible") setPresenceOnline();
+  }, 60000);
+  friendsRefreshTimer = setInterval(() => {
+    if (document.visibilityState === "visible" && user) loadFriends();
+  }, 60000);
+}
+
+function stopPresenceTimers() {
+  if (presenceTimer) clearInterval(presenceTimer);
+  if (friendsRefreshTimer) clearInterval(friendsRefreshTimer);
+  presenceTimer = null;
+  friendsRefreshTimer = null;
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!user) return;
+  if (document.visibilityState === "visible") setPresenceOnline();
+  else setPresenceOffline();
+});
+
+function presenceInfo(p = {}) {
+  const activeTs = p.lastActiveAt;
+  const activeDate = activeTs?.toDate ? activeTs.toDate() : activeTs ? new Date(activeTs) : null;
+  const online = p.online === true && !!activeDate &&
+    !Number.isNaN(activeDate.getTime()) &&
+    (Date.now() - activeDate.getTime() < PRESENCE_ONLINE_WINDOW_MS);
+  if (online) return { online: true, text: "Online now" };
+  const seenTs = p.lastSeenAt || p.lastActiveAt;
+  const date = seenTs?.toDate ? seenTs.toDate() : seenTs ? new Date(seenTs) : null;
+  if (!date || Number.isNaN(date.getTime())) return { online: false, text: "Last seen unavailable" };
+  return { online: false, text: "Last seen " + timeAgo(date) };
+}
+
+function timeAgo(date) {
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + " min" + (minutes === 1 ? "" : "s") + " ago";
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + " hour" + (hours === 1 ? "" : "s") + " ago";
+  const days = Math.floor(hours / 24);
+  return days + " day" + (days === 1 ? "" : "s") + " ago";
+}
 
 // PROFILE LOADING
 async function loadProfile() {
@@ -949,6 +1036,7 @@ async function loadFriends() {
           <div>
             <b>${safeText(p.name || "Etik member")}</b>
             <div class="meta">@${safeText(p.username || "member")}</div>
+            <div class="meta">${presenceInfo(p).online ? '<span class="online-dot"></span>' : ''}${safeText(presenceInfo(p).text)}</div>
           </div>
           <button class="secondary" data-chat="${safeText(id)}">Message</button>
         </div>
@@ -1019,46 +1107,108 @@ async function respondRequest(id, accept) {
 
 let activeChat = null;
 
+function stopChatListeners() {
+  if (messagesUnsubscribe) messagesUnsubscribe();
+  if (otherPresenceUnsubscribe) otherPresenceUnsubscribe();
+  if (conversationUnsubscribe) conversationUnsubscribe();
+  messagesUnsubscribe = null;
+  otherPresenceUnsubscribe = null;
+  conversationUnsubscribe = null;
+  activeOtherUid = null;
+  $("typing-indicator").textContent = "";
+}
+
+async function markIncomingMessagesRead(chatId) {
+  try {
+    const snap = await getDocs(query(
+      collection(db, "conversations", chatId, "messages"),
+      orderBy("createdAt", "asc"),
+      limit(100)
+    ));
+    const unread = snap.docs.filter(d => {
+      const m = d.data();
+      return m.senderUid !== user.uid && !m.read;
+    });
+    await Promise.all(unread.map(d => updateDoc(d.ref, {
+      read: true,
+      readAt: serverTimestamp()
+    })));
+  } catch (e) {
+    console.warn("Could not mark messages as read", e);
+  }
+}
+
 async function openChat(otherUid) {
   try {
     const snap = await getDoc(doc(db, "users", otherUid));
-
     if (!snap.exists()) return say("User not found.");
 
-    const friendship = await getDoc(
-      doc(db, "friendships", pairId(user.uid, otherUid))
-    );
+    const chatId = pairId(user.uid, otherUid);
+    const friendship = await getDoc(doc(db, "friendships", chatId));
+    if (!friendship.exists()) return say("You can only message friends.");
 
-    if (!friendship.exists()) {
-      return say("You can only message friends.");
-    }
-
-    activeChat = pairId(user.uid, otherUid);
+    stopChatListeners();
+    activeChat = chatId;
+    activeOtherUid = otherUid;
     $("chat-title").textContent = snap.data().name || "Chat";
     $("chat-panel").classList.remove("hidden");
     $("chat-messages").textContent = "Loading messages…";
 
-    const messages = await getDocs(query(
-      collection(db, "conversations", activeChat, "messages"),
+    const initialPresence = presenceInfo(snap.data());
+    $("chat-presence").innerHTML = `${initialPresence.online ? '<span class="online-dot"></span>' : ''}${safeText(initialPresence.text)}`;
+
+    otherPresenceUnsubscribe = onSnapshot(doc(db, "users", otherUid), profileSnap => {
+      const p = profileSnap.exists() ? profileSnap.data() : {};
+      const presence = presenceInfo(p);
+      $("chat-title").textContent = p.name || "Chat";
+      $("chat-presence").innerHTML = `${presence.online ? '<span class="online-dot"></span>' : ''}${safeText(presence.text)}`;
+    });
+
+    conversationUnsubscribe = onSnapshot(doc(db, "conversations", chatId), conversationSnap => {
+      const c = conversationSnap.exists() ? conversationSnap.data() : {};
+      const recent = c.typingUid === otherUid && c.typingAt?.toDate &&
+        Date.now() - c.typingAt.toDate().getTime() < 6000;
+      $("typing-indicator").textContent = recent ? (snap.data().name || "Friend") + " is typing…" : "";
+    });
+
+    await markIncomingMessagesRead(chatId);
+
+    messagesUnsubscribe = onSnapshot(query(
+      collection(db, "conversations", chatId, "messages"),
       orderBy("createdAt", "asc"),
       limit(100)
-    ));
+    ), async messages => {
+      if (activeChat !== chatId) return;
+      const incomingUnread = messages.docs.filter(d => {
+        const m = d.data();
+        return m.senderUid !== user.uid && !m.read;
+      });
+      if (incomingUnread.length) {
+        Promise.all(incomingUnread.map(d => updateDoc(d.ref, {
+          read: true,
+          readAt: serverTimestamp()
+        }))).catch(e => console.warn("Read receipt update failed", e));
+      }
 
-    $("chat-messages").innerHTML = messages.empty
-      ? '<p class="muted">Say hello to start the conversation.</p>'
-      : messages.docs.map(d => {
-          const m = d.data();
-
-          return `
-            <div class="card" style="padding:10px;margin:8px 0">
-              <b>${m.senderUid === user.uid ? "You" : safeText(snap.data().name || "Friend")}</b>
-              <p style="margin:4px 0;white-space:pre-wrap">${safeText(m.text)}</p>
-              <div class="meta">${safeText(time(m.createdAt))}</div>
-            </div>
-          `;
-        }).join("");
-
-    $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
+      $("chat-messages").innerHTML = messages.empty
+        ? '<p class="muted">Say hello to start the conversation.</p>'
+        : messages.docs.map(d => {
+            const m = d.data();
+            const mine = m.senderUid === user.uid;
+            return `
+              <div class="card" style="padding:10px;margin:8px 0">
+                <b>${mine ? "You" : safeText(snap.data().name || "Friend")}</b>
+                <p style="margin:4px 0;white-space:pre-wrap">${safeText(m.text)}</p>
+                <div class="meta">${safeText(time(m.createdAt))}</div>
+                ${mine ? `<div class="read-receipt">${m.read ? "✓✓ Seen" : "✓ Sent"}</div>` : ""}
+              </div>
+            `;
+          }).join("");
+      $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
+    }, e => {
+      console.error(e);
+      say("Could not load live messages: " + e.message);
+    });
   } catch (e) {
     console.error(e);
     say("Could not open chat: " + e.message);
@@ -1066,9 +1216,35 @@ async function openChat(otherUid) {
 }
 
 $("close-chat").onclick = () => {
+  if (activeChat) {
+    updateDoc(doc(db, "conversations", activeChat), {
+      typingUid: "",
+      typingAt: serverTimestamp()
+    }).catch(() => {});
+  }
+  stopChatListeners();
   $("chat-panel").classList.add("hidden");
   activeChat = null;
 };
+
+$("message-text").addEventListener("input", () => {
+  if (!activeChat || !user) return;
+  const now = Date.now();
+  if (now - lastTypingWrite > 1500) {
+    lastTypingWrite = now;
+    setDoc(doc(db, "conversations", activeChat), {
+      typingUid: user.uid,
+      typingAt: serverTimestamp()
+    }, { merge: true }).catch(e => console.warn("Typing status update failed", e));
+  }
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    if (activeChat) updateDoc(doc(db, "conversations", activeChat), {
+      typingUid: "",
+      typingAt: serverTimestamp()
+    }).catch(() => {});
+  }, 2500);
+});
 
 $("message-form").addEventListener("submit", async e => {
   e.preventDefault();
@@ -1086,9 +1262,15 @@ $("message-form").addEventListener("submit", async e => {
     await addDoc(collection(db, "conversations", activeChat, "messages"), {
       senderUid: user.uid,
       text: messageText,
+      read: false,
       createdAt: serverTimestamp()
     });
 
+    clearTimeout(typingTimeout);
+    await setDoc(doc(db, "conversations", activeChat), {
+      typingUid: "",
+      typingAt: serverTimestamp()
+    }, { merge: true }).catch(() => {});
     $("message-text").value = "";
 
     const other = (f.data().memberUids || []).find(x => x !== user.uid);
@@ -1099,9 +1281,17 @@ $("message-form").addEventListener("submit", async e => {
   }
 });
 
+// Best-effort update when the page is being closed or refreshed.
+window.addEventListener("pagehide", () => {
+  if (user) setPresenceOffline();
+});
+
 // SIGN OUT
 $("logout").onclick = async () => {
   try {
+    await setPresenceOffline();
+    stopPresenceTimers();
+    stopChatListeners();
     await signOut(auth);
     window.google?.accounts?.id?.disableAutoSelect();
     say("Signed out.");
