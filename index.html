@@ -97,6 +97,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
   .head-actions #header-name{display:none}
   .photo-tools button{min-width:120px;padding:10px}
 }
+
+/* Etik feature pack: additive styles */
+.feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.feature-box{background:var(--panel2);border:1px solid var(--border);border-radius:13px;padding:14px;margin:10px 0}
+.feature-box h3{margin:0 0 8px;font-size:15px}.feature-box input,.feature-box textarea,.feature-box select{margin:5px 0}
+.feature-chip{display:inline-block;border:1px solid var(--border);border-radius:99px;padding:4px 9px;margin:3px;font-size:12px;color:var(--muted)}
+.post-pin{color:var(--accent);font-size:12px;font-weight:bold}.feature-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.feature-row button{padding:8px 10px;font-size:12px}.feature-small{font-size:12px;color:var(--muted)}
+@media(max-width:650px){.feature-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 
@@ -133,6 +143,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
       <button class="navitem" data-view="friends">♧ Friends</button>
       <button class="navitem" data-view="messages">✉ Messages</button>
       <button class="navitem" data-view="saved">🔖 Saved posts</button>
+      <button class="navitem" data-view="explore">⌕ Explore</button>
+      <button class="navitem" data-view="features">✦ More features</button>
       <hr style="border-color:var(--border);margin-top:18px">
       <p class="muted" style="font-size:12px">YOUR SPACE, YOUR RULES ✦</p>
     </div>
@@ -150,6 +162,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
         <h2>Share something</h2>
         <form id="post-form">
           <textarea id="post-text" maxlength="2000" required placeholder="What's on your mind?"></textarea>
+          <div class="feature-box"><h3>Extra post options</h3><label for="post-image-url">Image URL (optional)</label><input id="post-image-url" type="url" placeholder="https://example.com/image.jpg"><label for="post-poll-question">Poll question (optional)</label><input id="post-poll-question" maxlength="180" placeholder="Ask your community…"><label for="post-poll-options">Poll options (comma-separated)</label><input id="post-poll-options" maxlength="300" placeholder="Option one, Option two"></div>
           <div class="row">
             <span class="muted" id="char-count">0 / 2000</span>
             <button class="primary" id="post-submit">Publish post ↗</button>
@@ -166,12 +179,14 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 
     <section id="view-profile" class="hidden">
       <div class="card">
-        <div class="cover"></div>
+        <div class="cover" id="profile-cover"></div>
         <div class="profile-info">
           <img id="profile-avatar" class="avatar" alt="Profile">
           <h2 id="profile-title">Your profile</h2>
           <div class="muted" id="profile-handle"></div>
           <p class="muted" id="profile-bio-display"></p>
+          <div class="feature-small" id="profile-status-display"></div>
+          <div class="feature-row" style="justify-content:center;margin-top:8px"><button class="secondary" id="profile-tab-posts">Posts</button><button class="secondary" id="profile-tab-about">About</button><button class="secondary" id="profile-tab-badges">Badges</button></div>
         </div>
       </div>
 
@@ -205,6 +220,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
           <label for="photoURL">Or use a picture URL (optional)</label>
           <input id="photoURL" type="url" maxlength="1000" placeholder="https://example.com/photo.jpg">
 
+          <label for="custom-status">Custom status</label><input id="custom-status" maxlength="80" placeholder="What are you up to?">
           <label for="bio">About me</label>
           <textarea id="bio" maxlength="300" placeholder="Write something about yourself…"></textarea>
 
@@ -273,6 +289,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
         </form>
       </div>
     </section>
+    <section id="view-explore" class="hidden">
+      <div class="card"><h2>Explore Etik</h2><p class="muted">Search people, posts and hashtags. Follow users locally to personalize your feed.</p><form id="global-search-form" class="comment-form"><input id="global-search" minlength="2" required placeholder="Search people, posts, #hashtags…"><button class="primary">Search</button></form><div id="global-search-results"></div></div>
+      <div class="card"><h2>Popular hashtags</h2><div id="hashtag-list"></div></div>
+      <div class="card"><h2>Communities & group chats</h2><p class="muted">Create a local community idea or group-chat list. Shared multi-user communities require additional Firestore collections and security rules.</p><form id="community-form" class="comment-form"><input id="community-name" maxlength="50" required placeholder="Community / group name"><button class="primary">Create</button></form><div id="community-list"></div></div>
+    </section>
+    <section id="view-features" class="hidden"><div class="card"><h2>✦ Etik features</h2><p class="muted">Extra controls are added without removing your existing feed, profile, friends, messages, or achievements.</p><div id="feature-hub"></div></div></section>
   </main>
 
   <aside class="right">
@@ -305,6 +327,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
   <button class="navitem" data-view="notifications">♧<br>Alerts</button>
   <button class="navitem" data-view="friends">♧<br>Friends</button>
   <button class="navitem" data-view="messages">✉<br>Messages</button>
+  <button class="navitem" data-view="explore">⌕<br>Explore</button>
 </nav>
 
 <footer>etik. · Your space, your pace.</footer>
@@ -837,6 +860,7 @@ $("profile-form").addEventListener("submit", async e => {
     }
 
     $("photo-upload-status").textContent = "Saving your profile…";
+
     // Update the display name in Firebase Authentication.
     // The profile photo itself is stored in Firestore.
     await updateProfile(user, {
@@ -1711,7 +1735,130 @@ async function loadNotifications() {
     el.innerHTML = "Notifications could not load. Check Firestore rules.";
   }
 }
+
+
+// ==================== ADDITIVE FEATURE PACK ====================
+// Some preferences (saved posts, follows, muted/archived chats, pins, accent and communities)
+// are stored in this browser. Shared features use Firestore where the existing rules permit it.
+const featureStore = {
+  get(key, fallbackValue=[]) { try { const v=JSON.parse(localStorage.getItem('etik-'+key)); return v ?? fallbackValue; } catch { return fallbackValue; } },
+  set(key, value) { try { localStorage.setItem('etik-'+key, JSON.stringify(value)); } catch {} }
+};
+let featureSort = featureStore.get('feed-sort','newest');
+let featureSearchCache = [];
+let pinnedPostIds = featureStore.get('pinned-posts',[]);
+let followedUids = featureStore.get('followed-users',[]);
+let mutedChats = featureStore.get('muted-chats',[]);
+let archivedChats = featureStore.get('archived-chats',[]);
+let pinnedMessages = featureStore.get('pinned-messages',{});
+let bookmarkCollections = featureStore.get('bookmark-collections',{});
+let localCommunities = featureStore.get('communities',[]);
+let notificationFilter = 'all';
+let privacyPrefs = featureStore.get('privacy',{showOnline:true,allowSearch:true,profilePublic:true});
+let accentColor = featureStore.get('accent-color','#8b5cf6');
+let chatLook = featureStore.get('chat-look',{size:15,bubbles:true});
+let activeProfileTab = 'posts';
+
+function addFeatureNav(){
+  const side=document.querySelector('.left .side');
+  if(side && !side.querySelector('[data-view="explore"]')) side.insertAdjacentHTML('beforeend','<button class="navitem" data-view="explore">⌕ Explore</button><button class="navitem" data-view="features">✦ More features</button>');
+  document.querySelectorAll('[data-view="explore"],[data-view="features"]').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+  document.querySelectorAll('[data-view="saved"]').forEach(b=>b.onclick=()=>switchView('saved'));
+}
+function renderFeatureHub(){
+ const el=$('feature-hub'); if(!el) return;
+ el.innerHTML=`
+ <div class="feature-grid">
+  <div class="feature-box"><h3>Feed controls</h3><label>Sort feed</label><select id="feature-sort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="popular">Most liked</option><option value="following">Following only</option></select><p class="feature-small">Following feed uses your local follow list.</p></div>
+  <div class="feature-box"><h3>Appearance</h3><label>Accent colour</label><input id="feature-accent" type="color" value="${esc(accentColor)}"><label>Profile banner colour</label><input id="feature-banner" type="color" value="${esc(featureStore.get('banner-color','#8b5cf6'))}"><label>Chat text size</label><select id="feature-chat-size"><option value="13">Small</option><option value="15">Medium</option><option value="18">Large</option></select><button class="primary" id="save-appearance">Save appearance</button></div>
+  <div class="feature-box"><h3>Profile status & tabs</h3><p class="feature-small">Edit your status in My profile. Profile badges are based on your existing achievements.</p><button class="secondary" id="go-profile-edit">Edit profile</button><button class="secondary" id="go-badges">View badges</button><button class="secondary" id="pin-own-post">Pin latest post</button></div>
+  <div class="feature-box"><h3>Bookmark collections</h3><input id="collection-name" maxlength="40" placeholder="Collection name"><button class="secondary" id="create-collection">Create collection</button><div id="collection-list"></div><p class="feature-small">Collections are stored in this browser.</p></div>
+  <div class="feature-box"><h3>Privacy controls</h3><label><input type="checkbox" id="privacy-online" style="width:auto"> Show online status in this browser</label><label><input type="checkbox" id="privacy-search" style="width:auto"> Allow profile to appear in searches</label><label><input type="checkbox" id="privacy-public" style="width:auto"> Public profile (display preference)</label><button class="primary" id="save-privacy">Save privacy preferences</button></div>
+  <div class="feature-box"><h3>Notifications</h3><label>Filter notifications</label><select id="notification-filter"><option value="all">All notifications</option><option value="unread">Unread only</option><option value="comments">Comments only</option></select><p class="feature-small">Apply the filter when opening Notifications.</p></div>
+  <div class="feature-box"><h3>Data export</h3><p class="feature-small">Download a JSON copy of your visible profile, loaded posts and local preferences.</p><button class="secondary" id="export-data">Export my data</button></div>
+  <div class="feature-box"><h3>Install Etik</h3><p class="feature-small">Use your browser menu → Install app / Add to Home Screen when available. Full PWA installation needs a hosted manifest and service worker.</p><button class="secondary" id="install-help">Show install help</button></div>
+  <div class="feature-box"><h3>Keyboard shortcuts</h3><div class="feature-small">Alt+1 Home · Alt+2 Profile · Alt+3 Friends · Alt+4 Messages · Alt+5 Explore · / Search</div></div>
+  <div class="feature-box"><h3>Reports & safety</h3><p class="feature-small">Report a post or user from Explore/feed. Reports are attempted in Firestore and may require a matching reports rule.</p><button class="secondary" id="safety-note">Safety information</button></div>
+ </div>`;
+ $('feature-sort').value=featureSort;
+ $('feature-chat-size').value=String(chatLook.size||15);
+ $('privacy-online').checked=privacyPrefs.showOnline!==false;
+ $('privacy-search').checked=privacyPrefs.allowSearch!==false;
+ $('privacy-public').checked=privacyPrefs.profilePublic!==false;
+ $('notification-filter').value=notificationFilter;
+ $('feature-sort').onchange=e=>{featureSort=e.target.value;featureStore.set('feed-sort',featureSort);loadFeed();};
+ $('save-appearance').onclick=()=>{accentColor=$('feature-accent').value;featureStore.set('accent-color',accentColor);featureStore.set('banner-color',$('feature-banner').value);chatLook.size=Number($('feature-chat-size').value);featureStore.set('chat-look',chatLook);document.documentElement.style.setProperty('--purple',accentColor);document.documentElement.style.setProperty('--accent',accentColor);$('profile-cover').style.background=`linear-gradient(120deg,${$('feature-banner').value},#38bdf8)`;say('Appearance saved.');};
+ $('go-profile-edit').onclick=()=>switchView('profile'); $('go-badges').onclick=()=>switchView('achievements');
+ $('pin-own-post').onclick=()=>{const p=posts.find(x=>x.uid===user?.uid);if(!p)return say('Publish a post first.');pinnedPostIds=[p.id,...pinnedPostIds.filter(x=>x!==p.id)];featureStore.set('pinned-posts',pinnedPostIds);renderFeed();say('Latest post pinned on your feed.');};
+ $('create-collection').onclick=()=>{const n=$('collection-name').value.trim();if(!n)return say('Enter a collection name.');bookmarkCollections[n]=bookmarkCollections[n]||[];featureStore.set('bookmark-collections',bookmarkCollections);$('collection-name').value='';renderCollections();say('Bookmark collection created.');};
+ $('save-privacy').onclick=()=>{privacyPrefs={showOnline:$('privacy-online').checked,allowSearch:$('privacy-search').checked,profilePublic:$('privacy-public').checked};featureStore.set('privacy',privacyPrefs);say('Privacy preferences saved in this browser.');};
+ $('notification-filter').onchange=e=>{notificationFilter=e.target.value;loadNotifications();};
+ $('export-data').onclick=exportEtikData;
+ $('install-help').onclick=()=>say('Open your browser menu and choose Install Etik or Add to Home Screen if offered.');
+ $('safety-note').onclick=()=>say('Do not share passwords or private information. Blocking and reporting may depend on Firestore rules.');
+ renderCollections();
+}
+function renderCollections(){const el=$('collection-list');if(!el)return;const names=Object.keys(bookmarkCollections);el.innerHTML=names.length?names.map(n=>`<div class="feature-row"><span class="feature-chip">${esc(n)} · ${(bookmarkCollections[n]||[]).length}</span><button class="secondary" data-collection="${esc(n)}">Add saved post</button></div>`).join(''):'<p class="feature-small">No collections yet.</p>';el.querySelectorAll('[data-collection]').forEach(b=>b.onclick=()=>{const n=b.dataset.collection;const id=prompt('Enter a post ID to add to '+n+' (find it in the browser console or use your saved posts):');if(!id)return;bookmarkCollections[n]=[...new Set([...(bookmarkCollections[n]||[]),id])];featureStore.set('bookmark-collections',bookmarkCollections);renderCollections();});}
+function exportEtikData(){const data={exportedAt:new Date().toISOString(),profile:{name:profile.name,username:profile.username,bio:profile.bio,photoURL:profile.photoURL},posts:posts.map(p=>({id:p.id,uid:p.uid,text:p.text,likes:p.likes,createdAt:p.createdAt?.toDate?p.createdAt.toDate().toISOString():null})),localPreferences:{savedPostIds,pinnedPostIds,followedUids,mutedChats,archivedChats,bookmarkCollections,privacyPrefs,accentColor}};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='etik-my-data.json';a.click();URL.revokeObjectURL(url);say('Your data export was created.');}
+function extractTags(text=''){return [...new Set((text.match(/#[a-zA-Z0-9_]{2,30}/g)||[]).map(x=>x.toLowerCase()))];}
+function renderHashtags(){const counts={};posts.forEach(p=>extractTags(p.text||'').forEach(t=>counts[t]=(counts[t]||0)+1));const tags=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,20);$('hashtag-list').innerHTML=tags.length?tags.map(([t,n])=>`<button class="secondary" data-tag-search="${esc(t)}">${esc(t)} · ${n}</button>`).join(''):'<p class="muted">Hashtags in posts will appear here.</p>';document.querySelectorAll('[data-tag-search]').forEach(b=>b.onclick=()=>{$('global-search').value=b.dataset.tagSearch;$('global-search-form').requestSubmit();});}
+$('global-search-form')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('global-search').value.trim().toLowerCase();const out=$('global-search-results');out.textContent='Searching…';let userRows=[];try{if(privacyPrefs.allowSearch){const us=await getDocs(query(collection(db,'users'),where('username','==',q.replace(/^@/,'')),limit(10)));userRows=us.docs.filter(d=>d.id!==user?.uid).map(d=>({id:d.id,...d.data()}));}}catch(err){console.warn('User search unavailable',err);}const matched=posts.filter(p=>(p.text||'').toLowerCase().includes(q)||(p.authorName||'').toLowerCase().includes(q)||(p.authorUsername||'').toLowerCase().includes(q)||extractTags(p.text||'').includes(q));out.innerHTML=[...userRows.map(u=>`<div class="feature-box"><b>${esc(u.name||'Etik member')}</b><div class="meta">@${esc(u.username||'member')}</div><div class="feature-row"><button class="secondary" data-follow-user="${esc(u.uid||u.id)}">${followedUids.includes(u.uid||u.id)?'Unfollow':'Follow'}</button><button class="danger" data-report-user="${esc(u.uid||u.id)}">Report</button></div></div>`),...matched.map(p=>`<div class="feature-box"><b>${esc(p.authorName||'Etik member')}</b><div class="post-text">${esc(p.text||'')}</div><div class="feature-row"><button class="secondary" data-follow-author="${esc(p.uid)}">${followedUids.includes(p.uid)?'Unfollow author':'Follow author'}</button><button class="danger" data-report-post="${esc(p.id)}">Report post</button></div></div>`)].join('')||'<p class="muted">No results found in the loaded feed.</p>';bindFollowButtons(out);bindReportButtons(out);});
+function bindFollowButtons(root=document){root.querySelectorAll('[data-follow-user],[data-follow-author]').forEach(b=>b.onclick=()=>{const id=b.dataset.followUser||b.dataset.followAuthor;if(id===user?.uid)return say('You cannot follow yourself.');followedUids=followedUids.includes(id)?followedUids.filter(x=>x!==id):[...followedUids,id];featureStore.set('followed-users',followedUids);b.textContent=followedUids.includes(id)?'Unfollow':'Follow';say(followedUids.includes(id)?'Following locally.':'Unfollowed.');});}
+async function sendReport(kind,id){if(!user)return;const reason=prompt('Briefly describe the issue:');if(!reason)return;try{await addDoc(collection(db,'reports'),{kind,targetId:id,reporterUid:user.uid,reason:reason.slice(0,500),createdAt:serverTimestamp(),status:'open'});say('Report submitted.');}catch(e){say('Report could not be saved. Your Firestore rules may need a reports collection rule.');}}
+function bindReportButtons(root=document){root.querySelectorAll('[data-report-user]').forEach(b=>b.onclick=()=>sendReport('user',b.dataset.reportUser));root.querySelectorAll('[data-report-post]').forEach(b=>b.onclick=()=>sendReport('post',b.dataset.reportPost));}
+$('community-form')?.addEventListener('submit',e=>{e.preventDefault();const n=$('community-name').value.trim();if(!n)return;localCommunities=[{name:n,createdAt:new Date().toISOString()},...localCommunities].slice(0,50);featureStore.set('communities',localCommunities);$('community-name').value='';renderLocalCommunities();say('Community idea saved in this browser.');});
+function renderLocalCommunities(){const el=$('community-list');if(!el)return;el.innerHTML=localCommunities.length?localCommunities.map((c,i)=>`<div class="feature-box"><b>${esc(c.name)}</b><div class="meta">Local community/group idea · ${new Date(c.createdAt).toLocaleDateString()}</div><button class="secondary" data-remove-community="${i}">Remove</button></div>`).join(''):'<p class="muted">No communities yet.</p>';el.querySelectorAll('[data-remove-community]').forEach(b=>b.onclick=()=>{localCommunities.splice(Number(b.dataset.removeCommunity),1);featureStore.set('communities',localCommunities);renderLocalCommunities();});}
+// Sort/filter feed without changing the underlying database data.
+const originalRenderFeed = renderFeed;
+renderFeed = function(){
+ const original=posts;
+ if(featureSort==='oldest') posts=[...posts].reverse();
+ else if(featureSort==='popular') posts=[...posts].sort((a,b)=>(b.likes?.length||0)-(a.likes?.length||0));
+ else if(featureSort==='following') posts=posts.filter(p=>p.uid===user?.uid||followedUids.includes(p.uid));
+ originalRenderFeed();
+ posts=original;
+ const feed=$('feed');
+ if(feed){feed.querySelectorAll('article.card').forEach(card=>{const text=card.querySelector('.post-text')?.textContent||'';const post=posts.find(p=>(p.text||'')===text && card.querySelector('.post-name')?.textContent===(p.authorName||'Etik member'));if(!post)return;const actions=card.querySelector('.post-actions');if(actions){const pin=document.createElement('button');pin.className='feature-pin';pin.textContent=pinnedPostIds.includes(post.id)?'📌 Pinned':'📌 Pin';pin.onclick=()=>{pinnedPostIds=pinnedPostIds.includes(post.id)?pinnedPostIds.filter(x=>x!==post.id):[post.id,...pinnedPostIds];featureStore.set('pinned-posts',pinnedPostIds);say(pinnedPostIds.includes(post.id)?'Post pinned locally.':'Post unpinned.');renderFeed();};actions.appendChild(pin);const report=document.createElement('button');report.textContent='Report';report.onclick=()=>sendReport('post',post.id);actions.appendChild(report);if(post.uid!==user?.uid){const follow=document.createElement('button');follow.textContent=followedUids.includes(post.uid)?'Unfollow':'Follow';follow.onclick=()=>{followedUids=followedUids.includes(post.uid)?followedUids.filter(x=>x!==post.uid):[...followedUids,post.uid];featureStore.set('followed-users',followedUids);say(followedUids.includes(post.uid)?'Following locally.':'Unfollowed.');renderFeed();};actions.appendChild(follow);}}if(pinnedPostIds.includes(post.id)){const h=document.createElement('div');h.className='post-pin';h.textContent='📌 PINNED POST';card.insertBefore(h,card.firstChild);}});}
+ renderHashtags();
+};
+// Add optional image URLs and polls when publishing a post. Existing text-only posting stays unchanged.
+const originalPostForm = $('post-form');
+originalPostForm.addEventListener('submit',async e=>{
+ const imageURL=$('post-image-url')?.value.trim()||'';const question=$('post-poll-question')?.value.trim()||'';const options=($('post-poll-options')?.value||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,6);
+ if(!imageURL&&!question)return;
+ e.preventDefault();e.stopImmediatePropagation();if(!user)return;
+ const text=$('post-text').value.trim();if(!text&&!imageURL&&!question)return say('Add text, an image URL, or a poll question.');
+ if(imageURL){try{const u=new URL(imageURL);if(!['https:','http:'].includes(u.protocol))throw new Error();}catch{return say('Enter a valid image URL.');}}
+ if(question&&options.length<2)return say('A poll needs at least two comma-separated options.');
+ const btn=$('post-submit');btn.disabled=true;
+ try{await addDoc(collection(db,'posts'),{uid:user.uid,authorName:name(),authorUsername:profile.username||'',authorPhoto:profile.photoURL||user.photoURL||'',text, imageURL, poll:question?{question,options,votes:{}}:null,likes:[],createdAt:serverTimestamp()});$('post-text').value='';$('post-image-url').value='';$('post-poll-question').value='';$('post-poll-options').value='';$('char-count').textContent='0 / 2000';say('Your post is live!');await loadFeed();}catch(err){console.error(err);say('Could not publish post: '+err.message);}finally{btn.disabled=false;}
+},true);
+// Decorate rendered posts with image/poll, hashtag chips, and poll voting.
+const renderFeedWithExtra = renderFeed;
+renderFeed = function(){renderFeedWithExtra();const feed=$('feed');if(!feed)return;feed.querySelectorAll('article.card').forEach(card=>{const text=card.querySelector('.post-text')?.textContent||'';const author=card.querySelector('.post-name')?.textContent||'';const p=posts.find(x=>(x.text||'')===text&&(x.authorName||'Etik member')===author);if(!p)return;const body=card.querySelector('.post-text');if(p.imageURL&&body&&!card.querySelector('[data-post-image]')){const im=document.createElement('img');im.dataset.postImage='1';im.src=p.imageURL;im.alt='Post image';im.style.cssText='max-width:100%;border-radius:12px;margin:8px 0';im.onerror=()=>im.remove();body.after(im);}if(p.poll&&body&&!card.querySelector('[data-poll]')){const box=document.createElement('div');box.className='feature-box';box.dataset.poll='1';box.innerHTML=`<b>${esc(p.poll.question)}</b>`+(p.poll.options||[]).map((o,i)=>`<button class="secondary" style="display:block;width:100%;text-align:left;margin-top:6px" data-vote-poll="${esc(p.id)}" data-vote-index="${i}">${esc(o)} · ${((p.poll.votes||{})[i]||[]).length||0} votes</button>`).join('');body.after(box);box.querySelectorAll('[data-vote-poll]').forEach(b=>b.onclick=async()=>{const latest=posts.find(x=>x.id===p.id)||p;const poll=latest.poll||p.poll;const votes={...(poll.votes||{})};Object.keys(votes).forEach(k=>votes[k]=(votes[k]||[]).filter(uid=>uid!==user.uid));const k=b.dataset.voteIndex;votes[k]=[...(votes[k]||[]),user.uid];try{await updateDoc(doc(db,'posts',p.id),{poll:{...poll,votes}});say('Vote saved.');await loadFeed();}catch(err){say('Could not vote. Firestore rules may need to allow poll updates.');}});}const tags=extractTags(p.text||'');if(tags.length&&body&&!card.querySelector('[data-post-tags]')){const tagbox=document.createElement('div');tagbox.dataset.postTags='1';tagbox.innerHTML=tags.map(t=>`<button class="secondary" data-inline-tag="${esc(t)}">${esc(t)}</button>`).join('');body.after(tagbox);tagbox.querySelectorAll('[data-inline-tag]').forEach(b=>b.onclick=()=>{switchView('explore');$('global-search').value=b.dataset.inlineTag;$('global-search-form').requestSubmit();});}});};
+// Chat features: search messages, extra reactions, pin messages, mute/archive chats, text size.
+function addChatTools(){const panel=$('chat-panel');if(!panel||$('chat-search'))return;const tools=document.createElement('div');tools.className='feature-box';tools.innerHTML='<h3>Chat tools</h3><div class="feature-row"><input id="chat-search" placeholder="Search loaded messages…"><button class="secondary" id="chat-search-btn">Search</button><button class="secondary" id="toggle-mute-chat">Mute chat</button><button class="secondary" id="toggle-archive-chat">Archive chat</button></div><div id="chat-search-results"></div><div id="pinned-chat-messages"></div>';panel.insertBefore(tools,$('chat-messages'));$('chat-search-btn').onclick=()=>{const q=$('chat-search').value.toLowerCase();const nodes=[...$('chat-messages').querySelectorAll('.card')].filter(n=>n.textContent.toLowerCase().includes(q));$('chat-search-results').textContent=q?`${nodes.length} matching loaded message(s).`:'';nodes.forEach(n=>{n.style.outline=q?'1px solid var(--accent)':'';});};$('toggle-mute-chat').onclick=()=>{if(!activeChat)return;mutedChats=mutedChats.includes(activeChat)?mutedChats.filter(x=>x!==activeChat):[...mutedChats,activeChat];featureStore.set('muted-chats',mutedChats);say(mutedChats.includes(activeChat)?'Chat muted locally.':'Chat unmuted.');$('toggle-mute-chat').textContent=mutedChats.includes(activeChat)?'Unmute chat':'Mute chat';};$('toggle-archive-chat').onclick=()=>{if(!activeChat)return;archivedChats=archivedChats.includes(activeChat)?archivedChats.filter(x=>x!==activeChat):[...archivedChats,activeChat];featureStore.set('archived-chats',archivedChats);say(archivedChats.includes(activeChat)?'Chat archived locally.':'Chat unarchived.');$('toggle-archive-chat').textContent=archivedChats.includes(activeChat)?'Unarchive chat':'Archive chat';};}
+const originalOpenChat = openChat;
+openChat = async function(uid){await originalOpenChat(uid);addChatTools();if(activeChat){$('toggle-mute-chat').textContent=mutedChats.includes(activeChat)?'Unmute chat':'Mute chat';$('toggle-archive-chat').textContent=archivedChats.includes(activeChat)?'Unarchive chat':'Archive chat';}};
+// Extra reaction buttons and message pin controls are attached after each chat render via a lightweight observer.
+const chatObserver=new MutationObserver(()=>{const list=$('chat-messages');if(!list)return;list.querySelectorAll('.card').forEach(card=>{const controls=card.querySelector('.feature-tools');if(!controls||controls.dataset.extended)return;controls.dataset.extended='1';const msgText=card.querySelector('p')?.textContent||'';const id=controls.querySelector('[data-react-message]')?.dataset.reactMessage;if(!id)return;['🔥','👍','😮','😢'].forEach(emoji=>{const b=document.createElement('button');b.className='secondary';b.textContent=emoji;b.onclick=()=>reactToMessage(id,emoji);controls.appendChild(b);});const pin=document.createElement('button');pin.className='secondary';pin.textContent='📌 Pin';pin.onclick=()=>{pinnedMessages[activeChat]=[...(pinnedMessages[activeChat]||[]).filter(x=>x.id!==id),{id,text:msgText}];featureStore.set('pinned-messages',pinnedMessages);renderPinnedMessages();say('Message pinned locally.');};controls.appendChild(pin);});renderPinnedMessages();});
+function renderPinnedMessages(){const el=$('pinned-chat-messages');if(!el||!activeChat)return;const list=pinnedMessages[activeChat]||[];el.innerHTML=list.length?'<h3>Pinned messages</h3>'+list.map(m=>`<div class="feature-chip">${esc(m.text.slice(0,100))}<button data-unpin-message="${esc(m.id)}">×</button></div>`).join(''):'';el.querySelectorAll('[data-unpin-message]').forEach(b=>b.onclick=()=>{pinnedMessages[activeChat]=(pinnedMessages[activeChat]||[]).filter(x=>x.id!==b.dataset.unpinMessage);featureStore.set('pinned-messages',pinnedMessages);renderPinnedMessages();});}
+chatObserver.observe($('chat-messages'),{childList:true,subtree:true});
+// Profile status, banner, badges and profile tabs.
+const originalRenderProfile=renderProfile;
+renderProfile=function(){originalRenderProfile();if($('custom-status'))$('custom-status').value=profile.customStatus||'';if($('profile-status-display'))$('profile-status-display').textContent=profile.customStatus?'✦ '+profile.customStatus:'';$('profile-cover').style.background=`linear-gradient(120deg,${featureStore.get('banner-color','#8b5cf6')},#38bdf8)`;};
+const profileForm=$('profile-form');profileForm.addEventListener('submit',async()=>{const status=$('custom-status')?.value.trim()||'';if(user){try{await setDoc(doc(db,'users',user.uid),{customStatus:status},{merge:true});profile.customStatus=status;}catch(e){console.warn('Could not save custom status',e);}}},true);
+$('profile-tab-posts')?.addEventListener('click',()=>{activeProfileTab='posts';say('Your posts are shown in the home feed.');switchView('home');});
+$('profile-tab-about')?.addEventListener('click',()=>{activeProfileTab='about';say(profile.bio||'No bio yet.');});
+$('profile-tab-badges')?.addEventListener('click',()=>switchView('achievements'));
+// Notification filter after the existing list renderer.
+const originalLoadNotifications=loadNotifications;
+loadNotifications=async function(){await originalLoadNotifications();const el=$('notifications-list');if(!el)return;const rows=[...el.children];if(notificationFilter==='unread')rows.forEach(r=>{if(!r.textContent.includes('NEW ·'))r.remove();});else if(notificationFilter==='comments')rows.forEach(r=>{if(!r.textContent.toLowerCase().includes('comment'))r.remove();});};
+// Presence display preference, shortcut keys, responsive shortcuts and install guidance.
+document.addEventListener('keydown',e=>{if(e.altKey&&['1','2','3','4','5'].includes(e.key)){e.preventDefault();switchView(({1:'home',2:'profile',3:'friends',4:'messages',5:'explore'})[e.key]);}if(e.key==='/'&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){e.preventDefault();switchView('explore');$('global-search')?.focus();}});
+function applyFeaturePreferences(){document.documentElement.style.setProperty('--purple',accentColor);document.documentElement.style.setProperty('--accent',accentColor);if($('profile-cover'))$('profile-cover').style.background=`linear-gradient(120deg,${featureStore.get('banner-color','#8b5cf6')},#38bdf8)`;}
+addFeatureNav();renderFeatureHub();renderLocalCommunities();applyFeaturePreferences();
+
 </script>
 </body>
 </html>
-
