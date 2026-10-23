@@ -80,6 +80,9 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 .online-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px}
 .typing{min-height:18px;font-size:12px;color:var(--muted);padding:4px 2px}
 .read-receipt{font-size:11px;color:var(--accent);text-align:right;margin-top:2px}
+.feature-tools{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.feature-tools button{padding:7px 9px;font-size:12px}
+.saved-label{color:var(--accent);font-size:12px}
 @media(max-width:950px){.layout{grid-template-columns:175px minmax(0,1fr)}.right{display:none}}
 @media(max-width:650px){
   header{height:60px;padding:0 12px}
@@ -129,6 +132,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
       <button class="navitem" data-view="notifications">♧ Notifications</button>
       <button class="navitem" data-view="friends">♧ Friends</button>
       <button class="navitem" data-view="messages">✉ Messages</button>
+      <button class="navitem" data-view="saved">🔖 Saved posts</button>
       <hr style="border-color:var(--border);margin-top:18px">
       <p class="muted" style="font-size:12px">YOUR SPACE, YOUR RULES ✦</p>
     </div>
@@ -218,6 +222,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
       </div>
     </section>
 
+    <section id="view-saved" class="hidden"><div class="card"><h2>🔖 Saved posts</h2><p class="muted">Posts you bookmark are saved to this browser.</p><div id="saved-feed"></div></div></section>
+
     <section id="view-achievements" class="hidden">
       <div class="card">
         <h2>Your achievements ✧</h2>
@@ -228,7 +234,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 
     <section id="view-notifications" class="hidden">
       <div class="card">
-        <h2>Notifications ♧</h2>
+        <div class="title-row"><h2>Notifications ♧</h2><button class="secondary" id="mark-all-notifications-read">Mark all read</button></div>
         <p class="muted">Community activity related to you.</p>
         <div id="notifications-list" class="empty">No notifications yet.</div>
       </div>
@@ -245,7 +251,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
         <div id="user-search-results"></div>
       </div>
       <div class="card"><h2>Friend requests</h2><div id="friend-requests" class="muted">Loading…</div></div>
-      <div class="card"><h2>Your friends</h2><div id="friends-list" class="muted">Loading…</div></div>
+      <div class="card"><h2>Your friends</h2><div id="friends-list" class="muted">Loading…</div></div><div class="card"><h2>Blocked users</h2><div id="blocked-list" class="muted">Loading…</div></div>
     </section>
 
     <section id="view-messages" class="hidden">
@@ -371,6 +377,9 @@ let conversationUnsubscribe = null;
 let typingTimeout = null;
 let lastTypingWrite = 0;
 let activeOtherUid = null;
+let savedPostIds = [];
+try { savedPostIds = JSON.parse(localStorage.getItem("etik-saved-posts") || "[]"); } catch { savedPostIds = []; }
+let chatReplyTo = null;
 const PRESENCE_ONLINE_WINDOW_MS = 150000;
 
 function say(message) {
@@ -427,6 +436,7 @@ function switchView(v) {
     el.classList.toggle("active", el.dataset.view === v);
   });
 
+  if (v === "saved") renderSavedPosts();
   if (v === "profile") renderProfile();
   if (v === "achievements") renderAchievements();
   if (v === "notifications") loadNotifications();
@@ -827,7 +837,6 @@ $("profile-form").addEventListener("submit", async e => {
     }
 
     $("photo-upload-status").textContent = "Saving your profile…";
-
     // Update the display name in Firebase Authentication.
     // The profile photo itself is stored in Firestore.
     await updateProfile(user, {
@@ -904,19 +913,29 @@ $("user-search-form").addEventListener("submit", async e => {
             <b>${safeText(x.name || "Etik member")}</b>
             <div class="meta">@${safeText(x.username || "")}</div>
           </div>
-          <button class="secondary" data-add-friend="${safeText(x.id)}">Add friend</button>
+          <button class="secondary" data-add-friend="${safeText(x.id)}">Add friend</button><button class="danger" data-block-user="${safeText(x.id)}">Block</button>
         </div>
       `).join("")
       : '<p class="muted">No matching user found.</p>';
 
-    out.querySelectorAll("[data-add-friend]").forEach(b => {
-      b.onclick = () => sendFriendRequest(b.dataset.addFriend);
-    });
+    out.querySelectorAll("[data-add-friend]").forEach(b => { b.onclick = () => sendFriendRequest(b.dataset.addFriend); });
+    out.querySelectorAll("[data-block-user]").forEach(b => { b.onclick = () => blockUser(b.dataset.blockUser); });
   } catch (e) {
     console.error(e);
     out.textContent = "Search failed. Check your Firestore rules.";
   }
 });
+
+async function blockUser(targetUid) {
+  if (!user || !targetUid || targetUid === user.uid) return;
+  if (!confirm("Block this user? This saves the block in your account. Existing friend/chat records are not automatically deleted.")) return;
+  try { await setDoc(doc(db,"users",user.uid,"blocked",targetUid), {uid:targetUid, createdAt:serverTimestamp()}); say("User blocked."); }
+  catch(e) { say("Could not block user. Check Firestore rules: " + e.message); }
+}
+async function unblockUser(targetUid) {
+  try { await deleteDoc(doc(db,"users",user.uid,"blocked",targetUid)); say("User unblocked."); }
+  catch(e) { say("Could not unblock user: " + e.message); }
+}
 
 async function sendFriendRequest(toUid) {
   if (!user || toUid === user.uid) return;
@@ -1198,12 +1217,19 @@ async function openChat(otherUid) {
             return `
               <div class="card" style="padding:10px;margin:8px 0">
                 <b>${mine ? "You" : safeText(snap.data().name || "Friend")}</b>
+                ${m.replyText ? `<div class="meta" style="border-left:2px solid var(--accent);padding-left:7px">Replying to: ${safeText(m.replyText)}</div>` : ""}
                 <p style="margin:4px 0;white-space:pre-wrap">${safeText(m.text)}</p>
-                <div class="meta">${safeText(time(m.createdAt))}</div>
+                ${m.reactions && Object.keys(m.reactions).length ? `<div class="meta">${Object.entries(m.reactions).map(([emoji,users])=>`${safeText(emoji)} ${(users||[]).length}`).join(" · ")}</div>` : ""}
+                <div class="meta">${safeText(time(m.createdAt))}${m.editedAt ? " · edited" : ""}</div>
+                <div class="feature-tools"><button class="secondary" data-react-message="${d.id}" data-emoji="❤️">❤️</button><button class="secondary" data-react-message="${d.id}" data-emoji="😂">😂</button><button class="secondary" data-reply-message="${d.id}" data-reply-text="${safeText(m.text).replace(/"/g,"&quot;")}">Reply</button>${mine ? `<button class="secondary" data-edit-message="${d.id}" data-message-text="${safeText(m.text).replace(/"/g,"&quot;")}">Edit</button><button class="danger" data-delete-message="${d.id}">Delete</button>` : ""}</div>
                 ${mine ? `<div class="read-receipt">${m.read ? "✓✓ Seen" : "✓ Sent"}</div>` : ""}
               </div>
             `;
           }).join("");
+      $("chat-messages").querySelectorAll("[data-react-message]").forEach(b => b.onclick = () => reactToMessage(b.dataset.reactMessage, b.dataset.emoji));
+      $("chat-messages").querySelectorAll("[data-reply-message]").forEach(b => b.onclick = () => { chatReplyTo = {id:b.dataset.replyMessage, text:b.dataset.replyText}; $("message-text").value = "↪ " + chatReplyTo.text + "\n"; $("message-text").focus(); say("Type your reply after the quoted message."); });
+      $("chat-messages").querySelectorAll("[data-edit-message]").forEach(b => b.onclick = () => editMessage(b.dataset.editMessage, b.dataset.messageText));
+      $("chat-messages").querySelectorAll("[data-delete-message]").forEach(b => b.onclick = () => deleteMessage(b.dataset.deleteMessage));
       $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
     }, e => {
       console.error(e);
@@ -1262,6 +1288,9 @@ $("message-form").addEventListener("submit", async e => {
     await addDoc(collection(db, "conversations", activeChat, "messages"), {
       senderUid: user.uid,
       text: messageText,
+      replyTo: chatReplyTo?.id || "",
+      replyText: chatReplyTo?.text || "",
+      reactions: {},
       read: false,
       createdAt: serverTimestamp()
     });
@@ -1272,6 +1301,7 @@ $("message-form").addEventListener("submit", async e => {
       typingAt: serverTimestamp()
     }, { merge: true }).catch(() => {});
     $("message-text").value = "";
+    chatReplyTo = null;
 
     const other = (f.data().memberUids || []).find(x => x !== user.uid);
     await openChat(other);
@@ -1280,6 +1310,29 @@ $("message-form").addEventListener("submit", async e => {
     say("Message failed: " + err.message);
   }
 });
+
+async function reactToMessage(messageId, emoji) {
+  if (!activeChat || !user) return;
+  try {
+    const ref = doc(db, "conversations", activeChat, "messages", messageId);
+    const snap = await getDoc(ref); if (!snap.exists()) return;
+    const reactions = {...(snap.data().reactions || {})};
+    const users = [...(reactions[emoji] || [])];
+    reactions[emoji] = users.includes(user.uid) ? users.filter(x=>x!==user.uid) : [...users,user.uid];
+    await updateDoc(ref, {reactions});
+  } catch(e) { say("Reaction failed: " + e.message); }
+}
+async function editMessage(messageId, oldText) {
+  const text = prompt("Edit your message:", oldText || ""); if (text === null) return;
+  if (!text.trim()) return say("Message cannot be empty.");
+  try { await updateDoc(doc(db,"conversations",activeChat,"messages",messageId), {text:text.trim(), editedAt:serverTimestamp()}); say("Message edited."); }
+  catch(e) { say("Could not edit message: " + e.message); }
+}
+async function deleteMessage(messageId) {
+  if (!confirm("Delete this message?")) return;
+  try { await deleteDoc(doc(db,"conversations",activeChat,"messages",messageId)); say("Message deleted."); }
+  catch(e) { say("Could not delete message: " + e.message); }
+}
 
 // Best-effort update when the page is being closed or refreshed.
 window.addEventListener("pagehide", () => {
@@ -1413,7 +1466,8 @@ function renderFeed() {
         <div class="post-actions">
           <button class="${liked ? "liked" : ""}" data-like="${esc(p.id)}">${liked ? "♥" : "♡"} ${(p.likes || []).length} Like</button>
           <button data-focus-comment="${esc(p.id)}">☷ ${cs.length} Comments</button>
-          ${p.uid === user.uid ? `<button data-delete="${esc(p.id)}">Delete</button>` : ""}
+          <button data-save-post="${esc(p.id)}">${savedPostIds.includes(p.id) ? "🔖 Saved" : "🔖 Save"}</button>
+          ${p.uid === user.uid ? `<button data-edit-post="${esc(p.id)}">Edit</button><button data-delete="${esc(p.id)}">Delete</button>` : ""}
         </div>
 
         <div>
@@ -1453,9 +1507,30 @@ function renderFeed() {
     f.addEventListener("submit", submitComment);
   });
 
-  document.querySelectorAll("[data-delete]").forEach(b => {
-    b.onclick = () => removePost(b.dataset.delete);
-  });
+  document.querySelectorAll("[data-delete]").forEach(b => { b.onclick = () => removePost(b.dataset.delete); });
+  document.querySelectorAll("[data-save-post]").forEach(b => { b.onclick = () => toggleSavedPost(b.dataset.savePost); });
+  document.querySelectorAll("[data-edit-post]").forEach(b => { b.onclick = () => editPost(b.dataset.editPost); });
+}
+
+function toggleSavedPost(id) {
+  savedPostIds = savedPostIds.includes(id) ? savedPostIds.filter(x => x !== id) : [...savedPostIds, id];
+  try { localStorage.setItem("etik-saved-posts", JSON.stringify(savedPostIds)); } catch {}
+  renderFeed(); renderSavedPosts();
+  say(savedPostIds.includes(id) ? "Post saved." : "Post removed from saved posts.");
+}
+function renderSavedPosts() {
+  const el = $("saved-feed"); if (!el) return;
+  const saved = posts.filter(p => savedPostIds.includes(p.id));
+  if (!saved.length) { el.innerHTML = '<div class="empty">No saved posts yet. Use 🔖 Save on a post to keep it here.</div>'; return; }
+  el.innerHTML = saved.map(p => `<article class="card"><b>${esc(p.authorName || "Etik member")}</b><div class="meta">@${esc(p.authorUsername || "member")} · ${esc(time(p.createdAt))}</div><p class="post-text">${esc(p.text || "")}</p><button class="secondary" data-unsave="${esc(p.id)}">Remove saved post</button></article>`).join("");
+  el.querySelectorAll("[data-unsave]").forEach(b => b.onclick = () => toggleSavedPost(b.dataset.unsave));
+}
+async function editPost(id) {
+  const p = posts.find(x => x.id === id); if (!p || p.uid !== user.uid) return;
+  const updated = prompt("Edit your post:", p.text || ""); if (updated === null) return;
+  const text = updated.trim(); if (!text) return say("Post cannot be empty.");
+  try { await updateDoc(doc(db, "posts", id), { text, editedAt: serverTimestamp() }); say("Post updated."); await loadFeed(); }
+  catch (e) { say("Could not edit post: " + e.message); }
 }
 
 async function toggleLike(id) {
@@ -1617,13 +1692,20 @@ async function loadNotifications() {
       const n = d.data();
 
       return `
-        <div style="padding:12px 0;border-bottom:1px solid var(--border)">
-          <b>${esc(n.fromName || "Someone")}</b>
+        <div style="padding:12px 0;border-bottom:1px solid var(--border);${n.read ? "" : "background:var(--panel2);padding:12px;border-radius:10px;"}">
+          ${n.read ? "" : "<span class=\"saved-label\">NEW · </span>"}<b>${esc(n.fromName || "Someone")}</b>
           ${esc(n.text || "interacted with your post")}
           <div class="meta">${esc(time(n.createdAt))}</div>
         </div>
       `;
     }).join("");
+    const unread = snap.docs.filter(d => !d.data().read).length;
+    const btn = $("notifications-btn"); if (btn) btn.textContent = unread ? `♧ ${unread}` : "♧";
+    const mark = $("mark-all-notifications-read");
+    if (mark) mark.onclick = async () => {
+      try { await Promise.all(snap.docs.filter(d => !d.data().read).map(d => updateDoc(d.ref, {read:true, readAt:serverTimestamp()}))); say("Notifications marked as read."); await loadNotifications(); }
+      catch (e) { say("Could not mark notifications read: " + e.message); }
+    };
   } catch (e) {
     console.error(e);
     el.innerHTML = "Notifications could not load. Check Firestore rules.";
@@ -1632,3 +1714,4 @@ async function loadNotifications() {
 </script>
 </body>
 </html>
+
