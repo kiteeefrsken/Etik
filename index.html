@@ -153,8 +153,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
         <h2>Your feed</h2>
         <button class="secondary" id="refresh-feed">↻ Refresh</button>
       </div>
-      <input id="feed-search" maxlength="100" placeholder="Search posts by words…" style="margin-bottom:12px">
-      <div class="row" style="margin:0 0 12px"><button class="secondary" id="show-saved">★ Saved posts</button><button class="secondary" id="show-all-posts">All posts</button></div>
       <div id="feed"><div class="card empty">Loading feed…</div></div>
     </section>
 
@@ -254,13 +252,9 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:12px}
       </div>
       <div class="card hidden" id="chat-panel">
         <div class="title-row">
-          <div>
-            <h2 id="chat-title">Chat</h2>
-            <div id="chat-presence" class="meta">Checking status…</div>
-          </div>
+          <h2 id="chat-title">Chat</h2>
           <button class="secondary" id="close-chat">Back</button>
         </div>
-        <div id="typing-indicator" class="meta" style="min-height:18px;margin-bottom:8px"></div>
         <div id="chat-messages" style="max-height:380px;overflow:auto"></div>
         <form id="message-form" class="comment-form">
           <input id="message-text" maxlength="2000" required placeholder="Write a message…">
@@ -333,9 +327,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
-  where,
-  onSnapshot,
-  arrayUnion
+  where
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -365,15 +357,6 @@ let timer;
 let selectedPhotoFile = null;
 let selectedPhotoPreviewURL = null;
 let currentPhotoURL = "";
-
-// New live-chat and presence state
-let activeChat = null;
-let activeChatOtherUid = null;
-let messagesUnsubscribe = null;
-let typingUnsubscribe = null;
-let presenceUnsubscribe = null;
-let typingTimeout = null;
-let presenceInterval = null;
 
 function say(message) {
   $("status").textContent = message;
@@ -515,10 +498,6 @@ function initGoogle() {
 initGoogle();
 
 onAuthStateChanged(auth, async current => {
-  if (presenceInterval) clearInterval(presenceInterval);
-  presenceInterval = null;
-  stopChatListeners();
-
   user = current;
 
   if (!user) {
@@ -531,56 +510,8 @@ onAuthStateChanged(auth, async current => {
   $("site").classList.remove("hidden");
 
   await loadProfile();
-  await setPresenceOnline();
-
-  presenceInterval = setInterval(() => {
-    if (user && document.visibilityState === "visible") {
-      setDoc(doc(db, "users", user.uid), {
-        online: true,
-        lastActiveAt: serverTimestamp()
-      }, { merge: true }).catch(err => console.warn("Presence heartbeat failed", err));
-    }
-  }, 60000);
-
   await loadFeed();
   await loadFriends();
-});
-
-async function setPresenceOnline() {
-  if (!user) return;
-
-  try {
-    await setDoc(doc(db, "users", user.uid), {
-      online: true,
-      lastActiveAt: serverTimestamp()
-    }, { merge: true });
-  } catch (e) {
-    console.warn("Could not update online status", e);
-  }
-}
-
-async function setPresenceOffline() {
-  if (!user) return;
-
-  try {
-    await setDoc(doc(db, "users", user.uid), {
-      online: false,
-      lastSeen: serverTimestamp()
-    }, { merge: true });
-  } catch (e) {
-    console.warn("Could not update last seen", e);
-  }
-}
-
-document.addEventListener("visibilitychange", () => {
-  if (!user) return;
-  if (document.visibilityState === "visible") setPresenceOnline();
-  else setPresenceOffline();
-});
-
-window.addEventListener("pagehide", () => {
-  // Best effort: the browser may close before Firestore finishes this write.
-  setPresenceOffline();
 });
 
 // PROFILE LOADING
@@ -641,7 +572,64 @@ function renderProfile() {
   $("profile-handle").textContent = handle + " · " + (user.email || "");
   $("profile-bio-display").textContent =
     profile.bio || "No bio yet — add a little about yourself.";
+
+  renderStats();
 }
+
+// COMPRESS PROFILE PICTURES FOR FIRESTORE
+async function compressProfilePhoto(file) {
+  const imageURL = URL.createObjectURL(file);
+
+  try {
+    const image = new Image();
+
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error("Could not read this image."));
+      image.src = imageURL;
+    });
+
+    const canvas = document.createElement("canvas");
+    const maxDimension = 600;
+
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(image.width, image.height)
+    );
+
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Image compression is not supported.");
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    for (const quality of [0.75, 0.6, 0.45, 0.3, 0.2]) {
+      const dataURL = canvas.toDataURL("image/jpeg", quality);
+
+      // Keep enough room for the other profile fields in Firestore.
+      if (dataURL.length <= 700000) {
+        return dataURL;
+      }
+    }
+
+    throw new Error(
+      "This picture is too large after compression. Please choose another."
+    );
+  } finally {
+    URL.revokeObjectURL(imageURL);
+  }
+}
+
+// PROFILE PHOTO: GALLERY AND CAMERA
+$("choose-gallery").onclick = () => {
+  $("gallery-file").click();
+};
+
+$("open-camera").onclick = () => {
+  $("camera-file").click();
+};
 
 function resetPhotoSelection() {
   selectedPhotoFile = null;
@@ -651,127 +639,143 @@ function resetPhotoSelection() {
     selectedPhotoPreviewURL = null;
   }
 
-  $("photo-preview").src = currentPhotoURL || fallback;
-  $("photo-upload-status").textContent = "Choose a picture to preview it here.";
+  const preview = $("photo-preview");
+  preview.src = currentPhotoURL || fallback;
+  $("photo-upload-status").textContent =
+    currentPhotoURL ? "Current profile picture" : "Choose a picture to preview it here.";
+
   $("cancel-photo").classList.add("hidden");
 }
 
-$("choose-gallery").onclick = () => $("gallery-file").click();
-$("open-camera").onclick = () => $("camera-file").click();
-
-function handlePhotoFile(file) {
+function handleSelectedPhoto(file) {
   if (!file) return;
 
+  if (!user) {
+    say("Please sign in first.");
+    return;
+  }
+
   if (!file.type.startsWith("image/")) {
-    say("Please choose an image file.");
+    say("Please select an image file.");
     return;
   }
 
   if (file.size > 5 * 1024 * 1024) {
-    say("The image must be 5 MB or smaller.");
+    say("Your picture must be 5 MB or smaller.");
     return;
   }
-
-  selectedPhotoFile = file;
 
   if (selectedPhotoPreviewURL) {
     URL.revokeObjectURL(selectedPhotoPreviewURL);
   }
 
+  selectedPhotoFile = file;
   selectedPhotoPreviewURL = URL.createObjectURL(file);
+
   $("photo-preview").src = selectedPhotoPreviewURL;
-  $("photo-upload-status").textContent = file.name;
+  $("photo-upload-status").textContent =
+    file.name + " — ready to save.";
   $("cancel-photo").classList.remove("hidden");
+
+  $("photoURL").value = "";
+
+  say("Picture selected. Click Save changes to save it.");
 }
 
 $("gallery-file").addEventListener("change", e => {
-  handlePhotoFile(e.target.files?.[0]);
+  handleSelectedPhoto(e.target.files?.[0]);
+  e.target.value = "";
 });
 
 $("camera-file").addEventListener("change", e => {
-  handlePhotoFile(e.target.files?.[0]);
+  handleSelectedPhoto(e.target.files?.[0]);
+  e.target.value = "";
 });
 
 $("cancel-photo").onclick = () => {
-  $("gallery-file").value = "";
-  $("camera-file").value = "";
   resetPhotoSelection();
+  $("photoURL").value = currentPhotoURL;
+  say("Picture selection cancelled.");
 };
 
-$("photoURL").addEventListener("input", () => {
-  if ($("photoURL").value.trim()) {
-    selectedPhotoFile = null;
-
-    if (selectedPhotoPreviewURL) {
-      URL.revokeObjectURL(selectedPhotoPreviewURL);
-      selectedPhotoPreviewURL = null;
-    }
-
-    $("photo-preview").src = $("photoURL").value.trim();
-    $("photo-upload-status").textContent = "Using the picture URL.";
-    $("cancel-photo").classList.add("hidden");
-  }
-});
-
+// PROFILE SAVE — USES FIRESTORE, NOT FIREBASE STORAGE
 $("profile-form").addEventListener("submit", async e => {
   e.preventDefault();
   if (!user) return;
+
+  const n = $("displayName").value.trim();
+  const u = $("username").value.trim();
+  const b = $("bio").value.trim();
+  const typedPhotoURL = $("photoURL").value.trim();
+
+  if (!n) return say("Please enter a display name.");
+
+  if (u && !/^[a-zA-Z0-9_]{3,30}$/.test(u)) {
+    return say("Username must be 3–30 letters, numbers or underscores.");
+  }
+
+  if (typedPhotoURL) {
+    try {
+      const parsed = new URL(typedPhotoURL);
+
+      if (!["https:", "http:"].includes(parsed.protocol)) {
+        return say("Please enter a valid image URL.");
+      }
+    } catch {
+      return say("Please enter a valid picture URL.");
+    }
+  }
 
   const saveButton = $("save-profile");
   saveButton.disabled = true;
 
   try {
-    const displayName = $("displayName").value.trim();
-    const username = $("username").value.trim().replace(/^@/, "").toLowerCase();
-    const bio = $("bio").value.trim();
-    const photoURL = $("photoURL").value.trim();
-
-    if (!displayName) {
-      say("Please enter a display name.");
-      return;
-    }
-
-    if (username && !/^[a-z0-9_]{3,30}$/.test(username)) {
-      say("Username must be 3–30 characters using letters, numbers, or underscores.");
-      return;
-    }
-
-    if (photoURL && !/^https?:\/\//i.test(photoURL)) {
-      say("Please enter a valid picture URL.");
-      return;
-    }
+    let finalPhotoURL = currentPhotoURL;
 
     if (selectedPhotoFile) {
-      say("Your selected picture is ready, but direct image upload requires Firebase Storage to be configured.");
-      return;
+      $("photo-upload-status").textContent = "Compressing picture…";
+      finalPhotoURL = await compressProfilePhoto(selectedPhotoFile);
+    } else if (typedPhotoURL) {
+      finalPhotoURL = typedPhotoURL;
     }
 
+    $("photo-upload-status").textContent = "Saving your profile…";
+
+    // Update the display name in Firebase Authentication.
+    // The profile photo itself is stored in Firestore.
     await updateProfile(user, {
-      displayName,
-      photoURL: photoURL || null
+      displayName: n
     });
 
     await setDoc(doc(db, "users", user.uid), {
       uid: user.uid,
-      name: displayName,
-      username,
-      bio,
-      photoURL: photoURL || "",
+      name: n,
+      username: u,
+      bio: b,
       email: user.email || "",
+      photoURL: finalPhotoURL || "",
+      provider: "google",
       updatedAt: serverTimestamp()
     }, { merge: true });
 
     profile = {
       ...profile,
-      name: displayName,
-      username,
-      bio,
-      photoURL: photoURL || ""
+      name: n,
+      username: u,
+      bio: b,
+      photoURL: finalPhotoURL || ""
     };
 
-    currentPhotoURL = photoURL || "";
+    currentPhotoURL = finalPhotoURL || "";
+    $("photoURL").value = currentPhotoURL;
+
+    resetPhotoSelection();
     renderProfile();
-    say("Profile saved.");
+
+    $("photo-upload-status").textContent = "Profile saved successfully!";
+    say("Profile saved!");
+
+    await loadFeed();
   } catch (e) {
     console.error(e);
     $("photo-upload-status").textContent = "Could not save your profile.";
@@ -809,56 +813,64 @@ $("user-search-form").addEventListener("submit", async e => {
     out.innerHTML = results.length
       ? results.map(x => `
         <div class="row">
-          <div class="post-head">
-            <img class="avatar" src="${img(x.photoURL)}" alt="">
-            <div>
-              <b>${esc(x.name || "Etik member")}</b>
-              <div class="meta">@${esc(x.username || "etik-member")}</div>
-            </div>
+          <div>
+            <b>${safeText(x.name || "Etik member")}</b>
+            <div class="meta">@${safeText(x.username || "")}</div>
           </div>
-          <button class="primary" data-add-friend="${esc(x.uid || x.id)}">Add friend</button>
+          <button class="secondary" data-add-friend="${safeText(x.id)}">Add friend</button>
         </div>
       `).join("")
-      : '<p class="muted">No matching users found.</p>';
+      : '<p class="muted">No matching user found.</p>';
 
-    out.querySelectorAll("[data-add-friend]").forEach(btn => {
-      btn.onclick = () => sendFriendRequest(btn.dataset.addFriend);
+    out.querySelectorAll("[data-add-friend]").forEach(b => {
+      b.onclick = () => sendFriendRequest(b.dataset.addFriend);
     });
   } catch (e) {
     console.error(e);
-    out.textContent = "Search failed. Check Firestore rules.";
+    out.textContent = "Search failed. Check your Firestore rules.";
   }
 });
 
 async function sendFriendRequest(toUid) {
-  if (!user || !toUid || toUid === user.uid) return;
+  if (!user || toUid === user.uid) return;
 
   try {
     const existing = await getDocs(query(
       collection(db, "friendRequests"),
       where("fromUid", "==", user.uid),
       where("toUid", "==", toUid),
+      where("status", "==", "pending"),
       limit(1)
     ));
 
-    if (!existing.empty) {
-      say("Friend request already sent.");
+    if (!existing.empty) return say("You already sent a request.");
+
+    const reverse = await getDocs(query(
+      collection(db, "friendRequests"),
+      where("fromUid", "==", toUid),
+      where("toUid", "==", user.uid),
+      where("status", "==", "pending"),
+      limit(1)
+    ));
+
+    if (!reverse.empty) {
+      say("They already sent you a request. Accept it below.");
+      await loadFriends();
       return;
     }
 
     await addDoc(collection(db, "friendRequests"), {
       fromUid: user.uid,
-      fromName: name(),
-      fromPhotoURL: profile.photoURL || user.photoURL || "",
       toUid,
       status: "pending",
       createdAt: serverTimestamp()
     });
 
-    say("Friend request sent.");
+    say("Friend request sent!");
+    await loadFriends();
   } catch (e) {
     console.error(e);
-    say("Could not send friend request: " + e.message);
+    say("Could not send request: " + e.message);
   }
 }
 
@@ -866,99 +878,123 @@ async function loadFriends() {
   if (!user) return;
 
   try {
-    const requests = await getDocs(query(
-      collection(db, "friendRequests"),
-      where("toUid", "==", user.uid),
-      where("status", "==", "pending"),
-      limit(50)
-    ));
+    const [incoming, outgoing, friendships] = await Promise.all([
+      getDocs(query(
+        collection(db, "friendRequests"),
+        where("toUid", "==", user.uid),
+        where("status", "==", "pending"),
+        limit(50)
+      )),
+      getDocs(query(
+        collection(db, "friendRequests"),
+        where("fromUid", "==", user.uid),
+        where("status", "==", "pending"),
+        limit(50)
+      )),
+      getDocs(query(
+        collection(db, "friendships"),
+        where("memberUids", "array-contains", user.uid),
+        limit(50)
+      ))
+    ]);
 
-    $("friend-requests").innerHTML = requests.empty
-      ? '<p class="muted">No pending requests.</p>'
-      : requests.docs.map(d => {
-          const r = d.data();
+    const requestRows = await Promise.all(incoming.docs.map(async d => {
+      const r = d.data();
+      let p = {};
 
-          return `
-            <div class="row">
-              <div class="post-head">
-                <img class="avatar" src="${img(r.fromPhotoURL)}" alt="">
-                <div><b>${esc(r.fromName || "Etik member")}</b></div>
-              </div>
-              <div>
-                <button class="primary" data-accept="${esc(d.id)}">Accept</button>
-                <button class="secondary" data-decline="${esc(d.id)}">Decline</button>
-              </div>
-            </div>
-          `;
-        }).join("");
+      try {
+        const s = await getDoc(doc(db, "users", r.fromUid));
+        if (s.exists()) p = s.data();
+      } catch {}
+
+      return `
+        <div class="row">
+          <div>
+            <b>${safeText(p.name || "Etik member")}</b>
+            <div class="meta">Wants to be your friend</div>
+          </div>
+          <span>
+            <button class="primary" data-accept="${d.id}">Accept</button>
+            <button class="secondary" data-decline="${d.id}">Decline</button>
+          </span>
+        </div>
+      `;
+    }));
+
+    $("friend-requests").innerHTML =
+      requestRows.join("") || '<p class="muted">No incoming requests.</p>';
 
     $("friend-requests").querySelectorAll("[data-accept]").forEach(b => {
-      b.onclick = () => respondFriendRequest(b.dataset.accept, true);
+      b.onclick = () => respondRequest(b.dataset.accept, true);
     });
 
     $("friend-requests").querySelectorAll("[data-decline]").forEach(b => {
-      b.onclick = () => respondFriendRequest(b.dataset.decline, false);
+      b.onclick = () => respondRequest(b.dataset.decline, false);
     });
 
-    const friendships = await getDocs(query(
-      collection(db, "friendships"),
-      where("memberUids", "array-contains", user.uid),
-      limit(100)
-    ));
+    const friendRows = await Promise.all(friendships.docs.map(async d => {
+      const members = d.data().memberUids || [];
+      const id = members.find(x => x !== user.uid);
+      if (!id) return "";
 
-    const friendUids = friendships.docs
-      .map(d => (d.data().memberUids || []).find(uid => uid !== user.uid))
-      .filter(Boolean);
+      let p = {};
 
-    const friendProfiles = await Promise.all(friendUids.map(async uid => {
       try {
-        const s = await getDoc(doc(db, "users", uid));
-        return s.exists() ? { uid, ...s.data() } : { uid, name: "Etik member" };
-      } catch {
-        return { uid, name: "Etik member" };
-      }
+        const s = await getDoc(doc(db, "users", id));
+        if (s.exists()) p = s.data();
+      } catch {}
+
+      return `
+        <div class="row">
+          <div>
+            <b>${safeText(p.name || "Etik member")}</b>
+            <div class="meta">@${safeText(p.username || "member")}</div>
+          </div>
+          <button class="secondary" data-chat="${safeText(id)}">Message</button>
+        </div>
+      `;
     }));
 
-    const html = friendProfiles.length
-      ? friendProfiles.map(f => `
-          <div class="row">
-            <div class="post-head">
-              <img class="avatar" src="${img(f.photoURL)}" alt="">
-              <div>
-                <b>${esc(f.name || "Etik member")}</b>
-                <div class="meta">@${esc(f.username || "etik-member")}</div>
-              </div>
-            </div>
-            <button class="primary" data-chat="${esc(f.uid)}">Message</button>
-          </div>
-        `).join("")
-      : '<p class="muted">No friends yet. Search for people by username.</p>';
+    $("friends-list").innerHTML =
+      friendRows.join("") || '<p class="muted">No friends yet. Search for someone above.</p>';
 
-    $("friends-list").innerHTML = html;
-    $("chat-friends").innerHTML = html;
+    $("chat-friends").innerHTML =
+      friendRows.join("") || '<p class="muted">Add friends to start chatting.</p>';
 
-    document.querySelectorAll("[data-chat]").forEach(b => {
+    $("friends-list").querySelectorAll("[data-chat]").forEach(b => {
+      b.onclick = () => {
+        switchView("messages");
+        openChat(b.dataset.chat);
+      };
+    });
+
+    $("chat-friends").querySelectorAll("[data-chat]").forEach(b => {
       b.onclick = () => openChat(b.dataset.chat);
     });
   } catch (e) {
     console.error(e);
-    $("friend-requests").textContent = "Friend requests could not load.";
-    $("friends-list").textContent = "Friends could not load.";
-    $("chat-friends").textContent = "Chats could not load.";
+    $("friend-requests").textContent =
+      "Could not load friends. Check the Firestore rules and indexes.";
   }
 }
 
-async function respondFriendRequest(id, accept) {
+async function respondRequest(id, accept) {
   try {
     const ref = doc(db, "friendRequests", id);
     const snap = await getDoc(ref);
 
-    if (!snap.exists()) return say("Request no longer exists.");
+    if (!snap.exists()) return;
 
     const r = snap.data();
-    if (r.toUid !== user.uid) return say("You cannot respond to this request.");
 
-    await updateDoc(ref, { status: accept ? "accepted" : "declined" });
+    if (r.toUid !== user.uid || r.status !== "pending") {
+      return say("This request is no longer available.");
+    }
+
+    await updateDoc(ref, {
+      status: accept ? "accepted" : "declined",
+      respondedAt: serverTimestamp()
+    });
 
     if (accept) {
       const memberUids = [r.fromUid, r.toUid].sort();
@@ -981,36 +1017,7 @@ async function respondFriendRequest(id, accept) {
   }
 }
 
-// NEW: live chat listeners
-function stopChatListeners() {
-  if (messagesUnsubscribe) messagesUnsubscribe();
-  if (typingUnsubscribe) typingUnsubscribe();
-  if (presenceUnsubscribe) presenceUnsubscribe();
-
-  messagesUnsubscribe = null;
-  typingUnsubscribe = null;
-  presenceUnsubscribe = null;
-
-  if (typingTimeout) clearTimeout(typingTimeout);
-  typingTimeout = null;
-}
-
-async function updateOwnTyping(isTyping) {
-  if (!user || !activeChat) return;
-
-  try {
-    await setDoc(
-      doc(db, "conversations", activeChat, "typing", user.uid),
-      {
-        typing: isTyping,
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
-  } catch (e) {
-    console.warn("Could not update typing status", e);
-  }
-}
+let activeChat = null;
 
 async function openChat(otherUid) {
   try {
@@ -1026,146 +1033,42 @@ async function openChat(otherUid) {
       return say("You can only message friends.");
     }
 
-    stopChatListeners();
-
     activeChat = pairId(user.uid, otherUid);
-    activeChatOtherUid = otherUid;
-
-    const otherProfile = snap.data();
-    const otherName = otherProfile.name || "Friend";
-
-    $("chat-title").textContent = otherName;
-    $("chat-presence").textContent = "Checking status…";
-    $("typing-indicator").textContent = "";
+    $("chat-title").textContent = snap.data().name || "Chat";
     $("chat-panel").classList.remove("hidden");
     $("chat-messages").textContent = "Loading messages…";
 
-    // Live online/last-seen status
-    presenceUnsubscribe = onSnapshot(
-      doc(db, "users", otherUid),
-      userSnap => {
-        if (!userSnap.exists()) {
-          $("chat-presence").textContent = "Status unavailable";
-          return;
-        }
+    const messages = await getDocs(query(
+      collection(db, "conversations", activeChat, "messages"),
+      orderBy("createdAt", "asc"),
+      limit(100)
+    ));
 
-        const data = userSnap.data();
-
-        if (data.online === true) {
-          $("chat-presence").textContent = "🟢 Online";
-        } else if (data.lastSeen) {
-          $("chat-presence").textContent = "Last seen " + time(data.lastSeen);
-        } else {
-          $("chat-presence").textContent = "Offline";
-        }
-      },
-      err => {
-        console.warn("Presence listener failed", err);
-        $("chat-presence").textContent = "Status unavailable";
-      }
-    );
-
-    // Live typing indicator
-    typingUnsubscribe = onSnapshot(
-      collection(db, "conversations", activeChat, "typing"),
-      typingSnap => {
-        const now = Date.now();
-
-        const otherTyping = typingSnap.docs.some(d => {
-          if (d.id === user.uid) return false;
-
-          const data = d.data();
-          if (data.typing !== true) return false;
-
-          const updated = data.updatedAt?.toDate?.()?.getTime();
-          return !updated || now - updated < 10000;
-        });
-
-        $("typing-indicator").textContent =
-          otherTyping ? otherName + " is typing…" : "";
-      },
-      err => console.warn("Typing listener failed", err)
-    );
-
-    // Live messages and seen receipts
-    messagesUnsubscribe = onSnapshot(
-      query(
-        collection(db, "conversations", activeChat, "messages"),
-        orderBy("createdAt", "desc"),
-        limit(100)
-      ),
-      async messages => {
-        if (!user || activeChat !== pairId(user.uid, otherUid)) return;
-
-        const list = [...messages.docs].reverse();
-
-        $("chat-messages").innerHTML = list.length
-          ? list.map(d => {
-              const m = d.data();
-              const mine = m.senderUid === user.uid;
-              const seenBy = Array.isArray(m.seenBy) ? m.seenBy : [];
-
-              const receipt = mine
-                ? (seenBy.includes(otherUid) ? "Seen ✓✓" : "Sent ✓")
-                : "";
-
-              return `
-                <div class="card" style="padding:10px;margin:8px 0;${mine ? "margin-left:12%;" : "margin-right:12%;"}">
-                  <b>${mine ? "You" : safeText(otherName)}</b>
-                  <p style="margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere">${safeText(m.text || "")}</p>
-                  <div class="meta">${safeText(time(m.createdAt))}${receipt ? " · " + receipt : ""}</div>
-                </div>
-              `;
-            }).join("")
-          : '<p class="muted">Say hello to start the conversation.</p>';
-
-        $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
-
-        // Mark incoming messages as seen while the chat is open.
-        for (const d of list) {
+    $("chat-messages").innerHTML = messages.empty
+      ? '<p class="muted">Say hello to start the conversation.</p>'
+      : messages.docs.map(d => {
           const m = d.data();
-          const seenBy = Array.isArray(m.seenBy) ? m.seenBy : [];
 
-          if (m.senderUid !== user.uid && !seenBy.includes(user.uid)) {
-            updateDoc(
-              doc(db, "conversations", activeChat, "messages", d.id),
-              { seenBy: arrayUnion(user.uid) }
-            ).catch(err => console.warn("Could not mark message as seen", err));
-          }
-        }
-      },
-      err => {
-        console.error(err);
-        say("Could not load live messages: " + err.message);
-      }
-    );
+          return `
+            <div class="card" style="padding:10px;margin:8px 0">
+              <b>${m.senderUid === user.uid ? "You" : safeText(snap.data().name || "Friend")}</b>
+              <p style="margin:4px 0;white-space:pre-wrap">${safeText(m.text)}</p>
+              <div class="meta">${safeText(time(m.createdAt))}</div>
+            </div>
+          `;
+        }).join("");
+
+    $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
   } catch (e) {
     console.error(e);
     say("Could not open chat: " + e.message);
   }
 }
 
-$("close-chat").onclick = async () => {
-  await updateOwnTyping(false);
-  stopChatListeners();
+$("close-chat").onclick = () => {
   $("chat-panel").classList.add("hidden");
-  $("chat-presence").textContent = "";
-  $("typing-indicator").textContent = "";
   activeChat = null;
-  activeChatOtherUid = null;
 };
-
-$("message-text").addEventListener("input", () => {
-  if (!activeChat || !user) return;
-
-  updateOwnTyping(true);
-
-  if (typingTimeout) clearTimeout(typingTimeout);
-
-  typingTimeout = setTimeout(() => {
-    updateOwnTyping(false);
-  }, 2200);
-});
 
 $("message-form").addEventListener("submit", async e => {
   e.preventDefault();
@@ -1173,28 +1076,23 @@ $("message-form").addEventListener("submit", async e => {
   const messageText = $("message-text").value.trim();
   if (!messageText || !activeChat) return;
 
-  const chatId = activeChat;
-
   try {
-    const f = await getDoc(doc(db, "friendships", chatId));
+    const f = await getDoc(doc(db, "friendships", activeChat));
 
     if (!f.exists() || !(f.data().memberUids || []).includes(user.uid)) {
       throw new Error("You are not a member of this chat.");
     }
 
-    await addDoc(collection(db, "conversations", chatId, "messages"), {
+    await addDoc(collection(db, "conversations", activeChat, "messages"), {
       senderUid: user.uid,
       text: messageText,
-      createdAt: serverTimestamp(),
-      seenBy: [user.uid]
+      createdAt: serverTimestamp()
     });
 
     $("message-text").value = "";
 
-    if (typingTimeout) clearTimeout(typingTimeout);
-    typingTimeout = null;
-
-    await updateOwnTyping(false);
+    const other = (f.data().memberUids || []).find(x => x !== user.uid);
+    await openChat(other);
   } catch (err) {
     console.error(err);
     say("Message failed: " + err.message);
@@ -1204,13 +1102,6 @@ $("message-form").addEventListener("submit", async e => {
 // SIGN OUT
 $("logout").onclick = async () => {
   try {
-    if (presenceInterval) clearInterval(presenceInterval);
-    presenceInterval = null;
-
-    await setPresenceOffline();
-    await updateOwnTyping(false);
-    stopChatListeners();
-
     await signOut(auth);
     window.google?.accounts?.id?.disableAutoSelect();
     say("Signed out.");
@@ -1232,330 +1123,300 @@ $("post-form").addEventListener("submit", async e => {
   try {
     await addDoc(collection(db, "posts"), {
       uid: user.uid,
-      name: name(),
-      username: profile.username || "",
-      photoURL: profile.photoURL || user.photoURL || "",
+      authorName: name(),
+      authorUsername: profile.username || "",
+      authorPhoto: profile.photoURL || user.photoURL || "",
       text,
-      createdAt: serverTimestamp(),
       likes: [],
-      savedBy: []
+      createdAt: serverTimestamp()
     });
 
     $("post-text").value = "";
     $("char-count").textContent = "0 / 2000";
-    say("Post published.");
+    say("Your post is live!");
     await loadFeed();
-    await updateActivityStats();
   } catch (e) {
     console.error(e);
-    say("Could not publish post: " + e.message);
+    say("Could not publish: " + e.message);
   } finally {
     $("post-submit").disabled = false;
   }
 });
 
-$("feed-search").addEventListener("input", () => {
-  feedSearchText = $("feed-search").value.trim().toLowerCase();
-  renderFeed();
-});
-
-$("show-saved").onclick = () => {
-  feedMode = "saved";
-  renderFeed();
-};
-
-$("show-all-posts").onclick = () => {
-  feedMode = "all";
-  renderFeed();
-};
-
-let feedMode = "all";
-let feedSearchText = "";
-
 async function loadFeed() {
   if (!user) return;
 
-  $("feed").innerHTML = '<div class="card empty">Loading feed…</div>';
+  $("feed").innerHTML = '<div class="card empty">Loading posts…</div>';
 
   try {
     const snap = await getDocs(query(
       collection(db, "posts"),
       orderBy("createdAt", "desc"),
-      limit(100)
+      limit(60)
     ));
 
     posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    comments = [];
+
+    for (const p of posts) {
+      try {
+        const cs = await getDocs(query(
+          collection(db, "posts", p.id, "comments"),
+          orderBy("createdAt", "asc"),
+          limit(30)
+        ));
+
+        cs.forEach(d => comments.push({
+          id: d.id,
+          postId: p.id,
+          ...d.data()
+        }));
+      } catch (e) {
+        console.warn("Comments unavailable", e);
+      }
+    }
+
     renderFeed();
-    await updateActivityStats();
+    renderStats();
+    renderAchievements();
   } catch (e) {
     console.error(e);
-    $("feed").innerHTML = '<div class="card empty">Could not load feed. Check Firestore rules.</div>';
+
+    $("feed").innerHTML = `
+      <div class="card empty">
+        <h2>Could not load the feed</h2>
+        <p>Check your Firestore database and security rules.</p>
+        <p>${esc(e.message)}</p>
+      </div>
+    `;
   }
 }
 
 function renderFeed() {
-  const filtered = posts.filter(p => {
-    const matchesText =
-      !feedSearchText ||
-      String(p.text || "").toLowerCase().includes(feedSearchText) ||
-      String(p.name || "").toLowerCase().includes(feedSearchText);
-
-    const matchesSaved =
-      feedMode !== "saved" ||
-      (Array.isArray(p.savedBy) && p.savedBy.includes(user?.uid));
-
-    return matchesText && matchesSaved;
-  });
-
-  if (!filtered.length) {
-    $("feed").innerHTML = '<div class="card empty">Nothing here yet. Create a post to get started!</div>';
+  if (!posts.length) {
+    $("feed").innerHTML = `
+      <div class="card empty">
+        <div style="font-size:30px">✧</div>
+        <b>It’s quiet out here.</b>
+        <p>Be the first to share something.</p>
+      </div>
+    `;
     return;
   }
 
-  $("feed").innerHTML = filtered.map(p => {
-    const likes = Array.isArray(p.likes) ? p.likes : [];
-    const savedBy = Array.isArray(p.savedBy) ? p.savedBy : [];
-    const liked = likes.includes(user?.uid);
-    const saved = savedBy.includes(user?.uid);
+  $("feed").innerHTML = posts.map(p => {
+    const liked = (p.likes || []).includes(user.uid);
+    const cs = comments.filter(c => c.postId === p.id);
 
     return `
-      <article class="card" data-post="${esc(p.id)}">
+      <article class="card">
         <div class="post-head">
-          <img class="avatar" src="${img(p.photoURL)}" alt="">
+          <img class="avatar" src="${img(p.authorPhoto)}" alt="">
           <div>
-            <div class="post-name">${esc(p.name || "Etik member")}</div>
-            <div class="meta">${p.username ? "@" + esc(p.username) + " · " : ""}${time(p.createdAt)}</div>
+            <div class="post-name">${esc(p.authorName || "Etik member")}</div>
+            <div class="meta">@${esc(p.authorUsername || "member")} · ${esc(time(p.createdAt))}</div>
           </div>
         </div>
+
         <div class="post-text">${esc(p.text || "")}</div>
+
         <div class="post-actions">
-          <button class="${liked ? "liked" : ""}" data-action="like" data-id="${esc(p.id)}">${liked ? "♥" : "♡"} ${likes.length} Like</button>
-          <button data-action="comment" data-id="${esc(p.id)}">▢ Comment</button>
-          <button data-action="save" data-id="${esc(p.id)}">${saved ? "★ Saved" : "☆ Save"}</button>
-          ${p.uid === user?.uid ? `<button data-action="delete" data-id="${esc(p.id)}">Delete</button>` : ""}
+          <button class="${liked ? "liked" : ""}" data-like="${esc(p.id)}">${liked ? "♥" : "♡"} ${(p.likes || []).length} Like</button>
+          <button data-focus-comment="${esc(p.id)}">☷ ${cs.length} Comments</button>
+          ${p.uid === user.uid ? `<button data-delete="${esc(p.id)}">Delete</button>` : ""}
         </div>
-        <div class="comments-area" id="comments-${esc(p.id)}"></div>
-        <form class="comment-form" data-comment-form="${esc(p.id)}">
-          <input name="comment" maxlength="500" required placeholder="Write a comment…">
-          <button class="primary">Reply</button>
-        </form>
-      </article>
-    `;
-  }).join("");
 
-  $("feed").querySelectorAll("[data-action]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const post = posts.find(p => p.id === btn.dataset.id);
-      if (!post) return;
-
-      try {
-        if (btn.dataset.action === "like") {
-          const likes = Array.isArray(post.likes) ? [...post.likes] : [];
-          const index = likes.indexOf(user.uid);
-
-          if (index >= 0) likes.splice(index, 1);
-          else likes.push(user.uid);
-
-          await updateDoc(doc(db, "posts", post.id), { likes });
-          await loadFeed();
-        }
-
-        if (btn.dataset.action === "save") {
-          const savedBy = Array.isArray(post.savedBy) ? [...post.savedBy] : [];
-          const index = savedBy.indexOf(user.uid);
-
-          if (index >= 0) savedBy.splice(index, 1);
-          else savedBy.push(user.uid);
-
-          await updateDoc(doc(db, "posts", post.id), { savedBy });
-          await loadFeed();
-        }
-
-        if (btn.dataset.action === "delete") {
-          if (post.uid !== user.uid) return;
-          if (!confirm("Delete this post?")) return;
-
-          await deleteDoc(doc(db, "posts", post.id));
-          say("Post deleted.");
-          await loadFeed();
-        }
-
-        if (btn.dataset.action === "comment") {
-          $("comments-" + post.id)?.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-          });
-        }
-      } catch (e) {
-        console.error(e);
-        say("Action failed: " + e.message);
-      }
-    });
-  });
-
-  $("feed").querySelectorAll("[data-comment-form]").forEach(form => {
-    form.addEventListener("submit", async e => {
-      e.preventDefault();
-
-      const postId = form.dataset.commentForm;
-      const input = form.querySelector('input[name="comment"]');
-      const text = input.value.trim();
-
-      if (!text) return;
-
-      try {
-        await addDoc(collection(db, "posts", postId, "comments"), {
-          uid: user.uid,
-          name: name(),
-          photoURL: profile.photoURL || user.photoURL || "",
-          text,
-          createdAt: serverTimestamp()
-        });
-
-        input.value = "";
-        say("Comment added.");
-        await loadComments(postId);
-        await updateActivityStats();
-      } catch (e) {
-        console.error(e);
-        say("Could not add comment: " + e.message);
-      }
-    });
-
-    loadComments(form.dataset.commentForm);
-  });
-}
-
-async function loadComments(postId) {
-  const el = $("comments-" + postId);
-  if (!el) return;
-
-  try {
-    const snap = await getDocs(query(
-      collection(db, "posts", postId, "comments"),
-      orderBy("createdAt", "asc"),
-      limit(50)
-    ));
-
-    el.innerHTML = snap.empty
-      ? ""
-      : snap.docs.map(d => {
-          const c = d.data();
-
-          return `
+        <div>
+          ${cs.map(c => `
             <div class="comment">
-              <img class="avatar" src="${img(c.photoURL)}" alt="">
+              <img class="avatar" src="${img(c.authorPhoto)}" alt="">
               <div class="comment-bubble">
-                <b>${esc(c.name || "Etik member")}</b>
+                <b>${esc(c.authorName || "Member")}</b>
                 <p>${esc(c.text || "")}</p>
                 <div class="meta">${esc(time(c.createdAt))}</div>
               </div>
             </div>
-          `;
-        }).join("");
+          `).join("")}
+
+          <form class="comment-form" data-comment-form="${esc(p.id)}">
+            <input name="comment" maxlength="500" required placeholder="Write a comment…">
+            <button class="secondary">Reply</button>
+          </form>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  document.querySelectorAll("[data-like]").forEach(b => {
+    b.onclick = () => toggleLike(b.dataset.like);
+  });
+
+  document.querySelectorAll("[data-focus-comment]").forEach(b => {
+    b.onclick = () => {
+      document.querySelector(
+        `[data-comment-form="${CSS.escape(b.dataset.focusComment)}"] input`
+      )?.focus();
+    };
+  });
+
+  document.querySelectorAll("[data-comment-form]").forEach(f => {
+    f.addEventListener("submit", submitComment);
+  });
+
+  document.querySelectorAll("[data-delete]").forEach(b => {
+    b.onclick = () => removePost(b.dataset.delete);
+  });
+}
+
+async function toggleLike(id) {
+  const p = posts.find(p => p.id === id);
+  if (!p) return;
+
+  const likes = p.likes || [];
+  const next = likes.includes(user.uid)
+    ? likes.filter(x => x !== user.uid)
+    : [...likes, user.uid];
+
+  try {
+    await updateDoc(doc(db, "posts", id), { likes: next });
+    p.likes = next;
+    renderFeed();
+    renderStats();
+    renderAchievements();
   } catch (e) {
     console.error(e);
-    el.innerHTML = '<p class="muted">Comments could not load.</p>';
+    say("Could not update like: " + e.message);
   }
 }
 
-async function updateActivityStats() {
-  if (!user) return;
+async function submitComment(e) {
+  e.preventDefault();
+
+  const form = e.currentTarget;
+  const id = form.dataset.commentForm;
+  const text = form.elements.comment.value.trim();
+
+  if (!text) return;
+
+  const post = posts.find(p => p.id === id);
 
   try {
-    const snap = await getDocs(query(
-      collection(db, "posts"),
-      where("uid", "==", user.uid),
-      limit(100)
-    ));
+    await addDoc(collection(db, "posts", id, "comments"), {
+      uid: user.uid,
+      authorName: name(),
+      authorPhoto: profile.photoURL || user.photoURL || "",
+      text,
+      createdAt: serverTimestamp()
+    });
 
-    const myPosts = snap.docs.map(d => d.data());
-    const postCount = myPosts.length;
-    const likeCount = myPosts.reduce((sum, p) =>
-      sum + (Array.isArray(p.likes) ? p.likes.length : 0), 0
-    );
-
-    let commentCount = 0;
-
-    for (const p of snap.docs) {
-      const cs = await getDocs(query(
-        collection(db, "posts", p.id, "comments"),
-        where("uid", "==", user.uid),
-        limit(100)
-      ));
-      commentCount += cs.size;
+    if (post && post.uid !== user.uid) {
+      await addDoc(collection(db, "users", post.uid, "notifications"), {
+        type: "comment",
+        fromUid: user.uid,
+        fromName: name(),
+        postId: id,
+        text: "commented on your post",
+        createdAt: serverTimestamp(),
+        read: false
+      });
     }
 
-    $("my-post-count").textContent = postCount;
-    $("my-like-count").textContent = likeCount;
-    $("my-comment-count").textContent = commentCount;
-    $("side-post-count").textContent = postCount;
-    $("side-like-count").textContent = likeCount;
-    $("side-comment-count").textContent = commentCount;
+    say("Comment added!");
+    await loadFeed();
   } catch (e) {
     console.error(e);
+    say("Could not add comment: " + e.message);
   }
 }
 
-async function renderAchievements() {
-  if (!user) return;
+async function removePost(id) {
+  const p = posts.find(p => p.id === id);
+  if (!p || p.uid !== user.uid) return;
+
+  if (!confirm("Delete this post?")) return;
 
   try {
-    const snap = await getDocs(query(
-      collection(db, "posts"),
-      where("uid", "==", user.uid),
-      limit(100)
-    ));
-
-    const postCount = snap.size;
-    const totalLikes = snap.docs.reduce((sum, d) => {
-      const likes = d.data().likes;
-      return sum + (Array.isArray(likes) ? likes.length : 0);
-    }, 0);
-
-    const achievements = [
-      { title: "First hello", desc: "Publish your first post.", unlocked: postCount >= 1 },
-      { title: "Getting started", desc: "Publish 5 posts.", unlocked: postCount >= 5 },
-      { title: "Conversation starter", desc: "Receive 10 likes.", unlocked: totalLikes >= 10 },
-      { title: "Community regular", desc: "Publish 20 posts.", unlocked: postCount >= 20 }
-    ];
-
-    $("achievement-list").innerHTML = achievements.map(a => `
-      <div class="achievement ${a.unlocked ? "" : "locked"}">
-        <b>${a.unlocked ? "✦" : "◇"} ${esc(a.title)}</b>
-        <div class="meta">${esc(a.desc)}</div>
-      </div>
-    `).join("");
-
-    $("side-achievements").innerHTML = achievements
-      .filter(a => a.unlocked)
-      .slice(0, 3)
-      .map(a => `<div class="achievement"><b>✦ ${esc(a.title)}</b></div>`)
-      .join("") || '<p class="muted">Your first achievement is waiting.</p>';
+    await deleteDoc(doc(db, "posts", id));
+    say("Post deleted.");
+    await loadFeed();
   } catch (e) {
     console.error(e);
-    $("achievement-list").textContent = "Achievements could not load.";
+    say("Could not delete post: " + e.message);
   }
 }
 
+// STATS AND ACHIEVEMENTS
+function renderStats() {
+  if (!user) return;
+
+  const mine = posts.filter(p => p.uid === user.uid);
+  const likes = mine.reduce((n, p) => n + (p.likes?.length || 0), 0);
+  const replies = comments.filter(c => c.uid === user.uid).length;
+
+  ["my-post-count", "side-post-count"].forEach(id => {
+    $(id).textContent = mine.length;
+  });
+
+  ["my-like-count", "side-like-count"].forEach(id => {
+    $(id).textContent = likes;
+  });
+
+  ["my-comment-count", "side-comment-count"].forEach(id => {
+    $(id).textContent = replies;
+  });
+}
+
+function achievementData() {
+  const mine = posts.filter(p => p.uid === user?.uid);
+  const likes = mine.reduce((n, p) => n + (p.likes?.length || 0), 0);
+  const replies = comments.filter(c => c.uid === user?.uid).length;
+
+  return [
+    {icon:"🌱",name:"First Etik",desc:"Publish your first post",ok:mine.length>=1},
+    {icon:"✍️",name:"Storyteller",desc:"Publish 5 posts",ok:mine.length>=5},
+    {icon:"💬",name:"Conversation Starter",desc:"Leave 3 comments",ok:replies>=3},
+    {icon:"💜",name:"Appreciated",desc:"Receive 10 likes",ok:likes>=10},
+    {icon:"🌟",name:"Regular",desc:"Publish 10 posts",ok:mine.length>=10}
+  ];
+}
+
+function renderAchievements() {
+  if (!user) return;
+
+  const data = achievementData();
+
+  $("achievement-list").innerHTML = data.map(a => `
+    <div class="achievement ${a.ok ? "" : "locked"}">
+      ${a.icon} <b>${a.ok ? "✓ " : ""}${a.name}</b><br>
+      <span class="muted">${a.desc}</span>
+    </div>
+  `).join("");
+
+  $("side-achievements").innerHTML =
+    data.filter(a => a.ok).slice(0, 3).map(a => `
+      <div class="achievement">${a.icon} ${a.name}</div>
+    `).join("") || '<p class="muted">Your first badge is waiting ✧</p>';
+}
+
+// NOTIFICATIONS
 async function loadNotifications() {
   if (!user) return;
 
   const el = $("notifications-list");
-  el.textContent = "Loading notifications…";
+  el.textContent = "Loading…";
 
   try {
     const snap = await getDocs(query(
-      collection(db, "notifications"),
-      where("toUid", "==", user.uid),
+      collection(db, "users", user.uid, "notifications"),
       orderBy("createdAt", "desc"),
-      limit(50)
+      limit(30)
     ));
 
     if (snap.empty) {
       el.innerHTML = `
         <div class="empty">
-          <b>No notifications yet.</b>
+          <div style="font-size:30px">♧</div>
+          <b>All quiet for now.</b>
           <p>When someone comments on your post, it can appear here.</p>
         </div>
       `;
